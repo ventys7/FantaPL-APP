@@ -18,8 +18,8 @@ export const RulesService = {
         // Parse values (since we stored them as strings in setup usually, or simplistic types)
         return response.documents.map(doc => ({
             ...doc,
-            value: parseValue(doc.value)
-        })) as AppRule[];
+            value: parseValue(doc.value) // @ts-ignore
+        })) as unknown as AppRule[];
     },
 
     async updateRule(key: string, newValue: any) {
