@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-pl-dark text-white font-sans antialiased;
+  }
+}
+
+/* Custom Scrollbar for Webkit */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-pl-dark;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-pl-hover rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-pl-purple;
+}
