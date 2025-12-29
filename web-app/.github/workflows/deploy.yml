@@ -11,6 +11,10 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web-app
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,6 +24,7 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
+          cache-dependency-path: web-app/package-lock.json
 
       - name: Install Dependencies
         run: npm ci
@@ -27,11 +32,10 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Inietta le variabili d'ambiente per il build
           VITE_APPWRITE_ENDPOINT: ${{ secrets.VITE_APPWRITE_ENDPOINT }}
           VITE_APPWRITE_PROJECT_ID: ${{ secrets.VITE_APPWRITE_PROJECT_ID }}
 
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: dist
+          folder: web-app/dist
