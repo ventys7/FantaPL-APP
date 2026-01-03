@@ -1,13 +1,13 @@
-import { Client, Account, Databases } from 'appwrite';
+import { Client, Account, Databases, Storage, Functions } from 'appwrite';
+import { logger } from './logger';
 
 const client = new Client();
 
-const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT;
-const projectId = import.meta.env.VITE_APPWRITE_PROJECT_ID;
+// Hardcoded for debugging - replace with env vars once working
+const endpoint = 'https://fra.cloud.appwrite.io/v1';
+const projectId = '6952ee8b000ce55dc6bc';
 
-if (!endpoint || !projectId) {
-    console.error("Appwrite Endpoint or Project ID missing in .env");
-}
+logger.debug('[Appwrite] Initializing with:', { endpoint, projectId });
 
 client
     .setEndpoint(endpoint)
@@ -15,11 +15,16 @@ client
 
 export const account = new Account(client);
 export const databases = new Databases(client);
+export const storage = new Storage(client);
+export const functions = new Functions(client);
 
-// Constants for DB IDs (We'll use standard names)
+// Constants for DB IDs
 export const DB_ID = 'fantapl_db';
 export const COLL_SETTINGS = 'app_settings';
 export const COLL_TEAMS = 'real_teams';
 export const COLL_PLAYERS = 'players';
 export const COLL_FIXTURES = 'fixtures';
 export const COLL_PERFORMANCES = 'performances';
+export const COLL_FANTASY_TEAMS = 'fantasy_teams';
+export const COLL_ARCHIVE = 'rules_archive';
+export const BUCKET_LOGOS = 'team_logos';
