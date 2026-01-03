@@ -224,149 +224,163 @@ export function Rules() {
                     </div>
                 )}
 
-                {/* Index */}
-                <div ref={indexRef} className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 mb-8">
-                    <h2 className="text-xl font-bold text-pl-teal mb-4">📑 Indice</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="text-gray-300 font-medium px-3 py-2 rounded-lg bg-white/5">
-                            {cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}
-                        </div>
-                        {sections.map(section => (
-                            <button
-                                key={section.id}
-                                onClick={() => scrollToSection(section.id)}
-                                className="text-left text-gray-300 hover:text-white font-medium px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition"
-                            >
-                                {section.title}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                {/* Main Content Grid */}
+                <div className="flex flex-col md:flex-row gap-8 items-start">
 
-                {/* Section 1: Cenni Principali */}
-                <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20 mb-8">
-                    <div className="text-center mb-8">
-                        {editMode && hasRole('admin') ? (
-                            <input
-                                type="text"
-                                value={cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}
-                                onChange={(e) => setCenniPrincipali(prev => ({ ...prev, title: e.target.value }))}
-                                className="text-3xl font-bold text-pl-teal bg-transparent border-b border-pl-pink/30 focus:outline-none focus:border-pl-pink text-center w-full"
-                            />
-                        ) : (
-                            <h2 className="text-3xl font-bold text-pl-teal">{cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}</h2>
-                        )}
-                    </div>
-                    <div className="text-gray-200 leading-relaxed mb-8 space-y-4">
-                        <EditableText
-                            value={cenniPrincipali.mainText}
-                            onChange={(val: string) => setCenniPrincipali(prev => ({ ...prev, mainText: val }))}
-                            editMode={editMode}
-                            multiline={true}
-                            dataField="mainText"
-                        />
-                    </div>
-
-                </div>
-
-                {/* Other Sections with Drag and Drop */}
-                <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                >
-                    <SortableContext
-                        items={sections.map(s => s.id)}
-                        strategy={verticalListSortingStrategy}
-                        disabled={!editMode || !hasRole('admin')}
-                    >
-                        <div className="space-y-4">
-                            {editMode && hasRole('admin') && (
+                    {/* Left Sidebar - Index (Sticky on Desktop) */}
+                    <div className="w-full md:w-1/4 md:sticky md:top-8 order-1">
+                        <div ref={indexRef} className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20">
+                            <h2 className="text-xl font-bold text-pl-teal mb-4 flex items-center gap-2">
+                                📑 Indice
+                            </h2>
+                            <div className="flex flex-col gap-2">
                                 <button
-                                    onClick={addSection}
-                                    className="w-full flex items-center justify-center gap-2 py-3 bg-pl-teal/20 hover:bg-pl-teal/30 rounded-xl text-white border border-pl-teal/50 transition"
+                                    onClick={() => scrollToSection(-1)} // -1 for Cenni Principali
+                                    className="text-left text-gray-300 hover:text-white font-medium px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition text-sm"
                                 >
-                                    <Plus size={20} />
-                                    Aggiungi Sezione
+                                    {cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}
                                 </button>
-                            )}
-
-                            {sections.map(section => (
-                                <SortableRulesSection
-                                    key={section.id}
-                                    id={section.id}
-                                    editMode={editMode && hasRole('admin')}
-                                >
-                                    <div
-                                        ref={el => sectionRefs.current[section.id] = el}
-                                        className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden"
+                                {sections.map(section => (
+                                    <button
+                                        key={section.id}
+                                        onClick={() => scrollToSection(section.id)}
+                                        className="text-left text-gray-300 hover:text-white font-medium px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition text-sm"
                                     >
-                                        <div
-                                            className="flex items-center justify-between p-6 cursor-pointer hover:bg-white/5 transition"
-                                            onClick={() => toggleSection(section.id)}
-                                        >
-                                            {editMode && hasRole('admin') ? (
-                                                <input
-                                                    type="text"
-                                                    value={section.title}
-                                                    onChange={e => updateSection(section.id, 'title', e.target.value)}
-                                                    onClick={e => e.stopPropagation()}
-                                                    className="flex-1 text-xl font-bold text-white bg-transparent border-b border-pl-pink/30 focus:outline-none focus:border-pl-pink text-center"
-                                                />
-                                            ) : (
-                                                <h3 className="flex-1 text-xl font-bold text-white text-center">{section.title}</h3>
-                                            )}
-                                            <ChevronDown
-                                                size={24}
-                                                className={`text-gray-400 transition-transform ml-4 ${activeSection === section.id ? 'rotate-180' : ''}`}
-                                            />
-                                            {editMode && hasRole('admin') && (
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); removeSection(section.id); }}
-                                                    className="ml-2 p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-400 border border-red-500/50 transition"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
-                                            )}
-                                        </div>
+                                        {section.title}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
 
-                                        {activeSection === section.id && (
-                                            <div className="p-6 pt-0 border-t border-white/10">
-                                                <div className="text-gray-200 leading-relaxed space-y-3">
-                                                    <EditableText
-                                                        value={section.content}
-                                                        onChange={(val: string) => updateSection(section.id, 'content', val)}
-                                                        editMode={editMode}
-                                                        multiline={true}
-                                                        dataField={`section-${section.id}`}
+                    {/* Right Content - Sections */}
+                    <div className="w-full md:w-3/4 order-2 space-y-8">
+
+                        {/* Section 1: Cenni Principali */}
+                        <div ref={el => sectionRefs.current[-1] = el} className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20">
+                            <div className="text-center mb-8">
+                                {editMode && hasRole('admin') ? (
+                                    <input
+                                        type="text"
+                                        value={cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}
+                                        onChange={(e) => setCenniPrincipali(prev => ({ ...prev, title: e.target.value }))}
+                                        className="text-3xl font-bold text-pl-teal bg-transparent border-b border-pl-pink/30 focus:outline-none focus:border-pl-pink text-center w-full"
+                                    />
+                                ) : (
+                                    <h2 className="text-3xl font-bold text-pl-teal">{cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}</h2>
+                                )}
+                            </div>
+                            <div className="text-gray-200 leading-relaxed space-y-4">
+                                <EditableText
+                                    value={cenniPrincipali.mainText}
+                                    onChange={(val: string) => setCenniPrincipali(prev => ({ ...prev, mainText: val }))}
+                                    editMode={editMode}
+                                    multiline={true}
+                                    dataField="mainText"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Other Sections with Drag and Drop */}
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext
+                                items={sections.map(s => s.id)}
+                                strategy={verticalListSortingStrategy}
+                                disabled={!editMode || !hasRole('admin')}
+                            >
+                                <div className="space-y-4">
+                                    {editMode && hasRole('admin') && (
+                                        <button
+                                            onClick={addSection}
+                                            className="w-full flex items-center justify-center gap-2 py-3 bg-pl-teal/20 hover:bg-pl-teal/30 rounded-xl text-white border border-pl-teal/50 transition"
+                                        >
+                                            <Plus size={20} />
+                                            Aggiungi Sezione
+                                        </button>
+                                    )}
+
+                                    {sections.map(section => (
+                                        <SortableRulesSection
+                                            key={section.id}
+                                            id={section.id}
+                                            editMode={editMode && hasRole('admin')}
+                                        >
+                                            <div
+                                                ref={el => sectionRefs.current[section.id] = el}
+                                                className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden"
+                                            >
+                                                <div
+                                                    className="flex items-center justify-between p-6 cursor-pointer hover:bg-white/5 transition"
+                                                    onClick={() => toggleSection(section.id)}
+                                                >
+                                                    {editMode && hasRole('admin') ? (
+                                                        <input
+                                                            type="text"
+                                                            value={section.title}
+                                                            onChange={e => updateSection(section.id, 'title', e.target.value)}
+                                                            onClick={e => e.stopPropagation()}
+                                                            className="flex-1 text-xl font-bold text-white bg-transparent border-b border-pl-pink/30 focus:outline-none focus:border-pl-pink text-center"
+                                                        />
+                                                    ) : (
+                                                        <h3 className="flex-1 text-xl font-bold text-white text-center">{section.title}</h3>
+                                                    )}
+                                                    <ChevronDown
+                                                        size={24}
+                                                        className={`text-gray-400 transition-transform ml-4 ${activeSection === section.id ? 'rotate-180' : ''}`}
                                                     />
+                                                    {editMode && hasRole('admin') && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); removeSection(section.id); }}
+                                                            className="ml-2 p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-400 border border-red-500/50 transition"
+                                                        >
+                                                            <Trash2 size={18} />
+                                                        </button>
+                                                    )}
                                                 </div>
-                                                {openedFromIndex && activeSection === section.id && (
-                                                    <button
-                                                        onClick={scrollToIndex}
-                                                        className="mt-6 flex items-center gap-2 px-4 py-2 bg-pl-teal/20 hover:bg-pl-teal/30 rounded-lg text-white border border-pl-teal/50 transition mx-auto"
-                                                    >
-                                                        <ArrowUp size={18} />
-                                                        Torna all'Indice
-                                                    </button>
+
+                                                {activeSection === section.id && (
+                                                    <div className="p-6 pt-0 border-t border-white/10">
+                                                        <div className="text-gray-200 leading-relaxed space-y-3">
+                                                            <EditableText
+                                                                value={section.content}
+                                                                onChange={(val: string) => updateSection(section.id, 'content', val)}
+                                                                editMode={editMode}
+                                                                multiline={true}
+                                                                dataField={`section-${section.id}`}
+                                                            />
+                                                        </div>
+                                                        {openedFromIndex && activeSection === section.id && (
+                                                            <button
+                                                                onClick={scrollToIndex}
+                                                                className="mt-6 flex items-center gap-2 px-4 py-2 bg-pl-teal/20 hover:bg-pl-teal/30 rounded-lg text-white border border-pl-teal/50 transition mx-auto md:hidden"
+                                                            >
+                                                                <ArrowUp size={18} />
+                                                                Torna all'Indice
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
-                                        )}
-                                    </div>
-                                </SortableRulesSection>
-                            ))}
-                        </div>
-                    </SortableContext>
-                </DndContext>
+                                        </SortableRulesSection>
+                                    ))}
+                                </div>
+                            </SortableContext>
+                        </DndContext>
 
-                <div className="mt-8 text-center text-gray-500 text-sm italic">
-                    <p>⚠️ SOLTANTO i membri del Comitato Decisionale possono modificare questo documento.</p>
+                        <div className="mt-8 text-center text-gray-500 text-sm italic">
+                            <p>⚠️ SOLTANTO i membri del Comitato Decisionale possono modificare questo documento.</p>
+                        </div>
+
+                        {/* Archive Section */}
+                        <ArchiveSection archives={archivedRules} />
+                    </div>
                 </div>
 
-                {/* Archive Section */}
-                <ArchiveSection archives={archivedRules} />
-
-                {/* Text Formatting Toolbar */}
+                {/* Text Formatting Toolbar - Fixed Position (Global) */}
                 {editMode && hasRole('admin') && (
                     <TextFormattingToolbar
                         visible={showToolbar}
