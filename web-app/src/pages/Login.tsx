@@ -29,7 +29,7 @@ export function Login() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pl-dark via-pl-purple to-pl-dark px-4">
+        <div className="h-[100dvh] overflow-hidden flex items-center justify-center bg-gradient-to-br from-pl-dark via-pl-purple to-pl-dark px-4">
             <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-white/20">
                 <div className="text-center mb-8">
                     <Shield className="w-16 h-16 text-pl-pink mx-auto mb-4" />
