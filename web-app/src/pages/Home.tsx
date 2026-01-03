@@ -14,7 +14,7 @@ export const Home = () => {
 
                 {/* Season Tag */}
                 <div className="animate-fade-in">
-                    <span className="inline-flex items-center px-4 py-1.5 md:px-6 md:py-2 rounded-full bg-white/5 border border-white/10 text-sm md:text-base font-medium text-pl-teal backdrop-blur-sm shadow-lg">
+                    <span className="inline-flex items-center px-4 py-1.5 md:px-8 md:py-3 rounded-full bg-white/5 border border-white/10 text-base md:text-xl font-medium text-pl-teal backdrop-blur-sm shadow-lg">
                         Season 25/26
                     </span>
                 </div>
@@ -24,23 +24,23 @@ export const Home = () => {
                     <img
                         src={logo}
                         alt="FantaPL Logo"
-                        className="w-40 md:w-64 h-auto drop-shadow-[0_0_25px_rgba(0,255,133,0.3)] hover:scale-105 transition-transform duration-500"
+                        className="w-52 md:w-80 h-auto drop-shadow-[0_0_25px_rgba(0,255,133,0.3)] hover:scale-105 transition-transform duration-500"
                     />
                 </div>
 
                 {/* Text Content */}
                 <div className="animate-slide-up flex flex-col items-center text-center space-y-1 md:space-y-2">
                     <div className="space-y-0">
-                        <h2 className="text-4xl md:text-6xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pl-teal to-pl-pink drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
+                        <h2 className="text-5xl md:text-8xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pl-teal to-pl-pink drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
                             Fantacalcio
                         </h2>
-                        <h1 className="text-3xl md:text-5xl font-bold text-white tracking-widest uppercase">
+                        <h1 className="text-4xl md:text-7xl font-bold text-white tracking-widest uppercase">
                             Premier League
                         </h1>
                     </div>
 
                     <div className="mt-1 md:mt-4 max-w-xs md:max-w-2xl mx-auto">
-                        <p className="text-sm md:text-xl text-gray-300 font-light italic leading-tight">
+                        <p className="text-base md:text-3xl text-gray-300 font-light italic leading-tight">
                             L'intensità del calcio inglese <br className="md:hidden" /> con le regole del fantacalcio italiano
                         </p>
                     </div>
