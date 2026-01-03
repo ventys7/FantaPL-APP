@@ -33,8 +33,8 @@ export function Login() {
             <div className="max-w-md w-full bg-white/10 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-white/20">
                 <div className="text-center mb-8">
                     <Shield className="w-16 h-16 text-pl-pink mx-auto mb-4" />
-                    <h1 className="text-3xl font-bold text-white mb-2">FantaPL Accesso</h1>
-                    <p className="text-gray-300">Inserisci il tuo nome utente</p>
+                    <h1 className="text-3xl font-bold text-white mb-2">Accesso</h1>
+                    <p className="text-gray-300">Inserisci le tue credenziali</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -77,6 +77,11 @@ export function Login() {
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleSubmit(e as any);
+                                }
+                            }}
                             className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pl-pink"
                             placeholder="••••••••"
                             required
@@ -97,9 +102,7 @@ export function Login() {
                         {loading ? 'Accesso...' : 'Entra'}
                     </button>
 
-                    <div className="text-center text-xs text-gray-500 mt-6">
-                        <p>Accesso riservato ai partecipanti FantaPL</p>
-                    </div>
+
                 </form>
             </div>
         </div>

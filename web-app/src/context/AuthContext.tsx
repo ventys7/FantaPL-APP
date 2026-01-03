@@ -91,9 +91,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             logger.error('Login failed:', error);
             const appwriteError = error as AppwriteException;
+
+            // Translate common Appwrite errors to Italian
+            let errorMessage = 'Credenziali non valide';
+            if (appwriteError.message) {
+                if (appwriteError.message.includes('Invalid credentials') ||
+                    appwriteError.message.includes('Invalid email') ||
+                    appwriteError.message.includes('Invalid password')) {
+                    errorMessage = 'Nome utente o password errati';
+                } else if (appwriteError.message.includes('Rate limit')) {
+                    errorMessage = 'Troppi tentativi. Riprova tra qualche minuto.';
+                } else if (appwriteError.message.includes('Network')) {
+                    errorMessage = 'Errore di connessione. Controlla la tua rete.';
+                } else {
+                    errorMessage = appwriteError.message;
+                }
+            }
+
             return {
                 success: false,
-                error: appwriteError.message || 'Credenziali non valide'
+                error: errorMessage
             };
         }
     };
