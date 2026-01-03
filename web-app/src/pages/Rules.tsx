@@ -254,177 +254,176 @@ export function Rules() {
                                 ))}
                             </div>
                         </div>
-                    </div>
-
-                    {/* Archive Dropdown (Below Index) */}
-                    <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 mt-4">
-                        <h2 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2">
-                            <Archive size={24} />
-                            Archivio
-                        </h2>
-                        {archivedRules.length === 0 ? (
-                            <p className="text-gray-400 text-sm italic">Nessun archivio.</p>
-                        ) : (
-                            <div className="space-y-2">
-                                {archivedRules.map(archive => (
-                                    <button
-                                        key={archive.$id}
-                                        onClick={() => setSelectedArchive(archive)}
-                                        className="w-full text-left text-gray-300 hover:text-white font-medium px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition text-sm flex items-center gap-2"
-                                    >
-                                        <Clock size={14} className="text-amber-400" />
-                                        <span>Stagione {archive.season}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Right Content - Sections */}
-                <div className="w-full md:w-3/4 order-2 space-y-8">
-
-                    {/* Section 1: Cenni Principali */}
-                    <div ref={el => sectionRefs.current[-1] = el} className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20">
-                        <div className="text-center mb-8">
-                            {editMode && hasRole('admin') ? (
-                                <input
-                                    type="text"
-                                    value={cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}
-                                    onChange={(e) => setCenniPrincipali(prev => ({ ...prev, title: e.target.value }))}
-                                    className="text-3xl font-bold text-pl-teal bg-transparent border-b border-pl-pink/30 focus:outline-none focus:border-pl-pink text-center w-full"
-                                />
+                        {/* Archive Dropdown (Below Index) */}
+                        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 mt-4">
+                            <h2 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2">
+                                <Archive size={24} />
+                                Archivio
+                            </h2>
+                            {archivedRules.length === 0 ? (
+                                <p className="text-gray-400 text-sm italic">Nessun archivio.</p>
                             ) : (
-                                <h2 className="text-3xl font-bold text-pl-teal">{cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}</h2>
+                                <div className="space-y-2">
+                                    {archivedRules.map(archive => (
+                                        <button
+                                            key={archive.$id}
+                                            onClick={() => setSelectedArchive(archive)}
+                                            className="w-full text-left text-gray-300 hover:text-white font-medium px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition text-sm flex items-center gap-2"
+                                        >
+                                            <Clock size={14} className="text-amber-400" />
+                                            <span>Stagione {archive.season}</span>
+                                        </button>
+                                    ))}
+                                </div>
                             )}
                         </div>
-                        <div className="text-gray-200 leading-relaxed space-y-4">
-                            <EditableText
-                                value={cenniPrincipali.mainText}
-                                onChange={(val: string) => setCenniPrincipali(prev => ({ ...prev, mainText: val }))}
-                                editMode={editMode}
-                                multiline={true}
-                                dataField="mainText"
-                            />
-                        </div>
                     </div>
 
-                    {/* Other Sections with Drag and Drop */}
-                    <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleDragEnd}
-                    >
-                        <SortableContext
-                            items={sections.map(s => s.id)}
-                            strategy={verticalListSortingStrategy}
-                            disabled={!editMode || !hasRole('admin')}
-                        >
-                            <div className="space-y-4">
-                                {editMode && hasRole('admin') && (
-                                    <button
-                                        onClick={addSection}
-                                        className="w-full flex items-center justify-center gap-2 py-3 bg-pl-teal/20 hover:bg-pl-teal/30 rounded-xl text-white border border-pl-teal/50 transition"
-                                    >
-                                        <Plus size={20} />
-                                        Aggiungi Sezione
-                                    </button>
-                                )}
+                    {/* Right Content - Sections */}
+                    <div className="w-full md:w-3/4 order-2 space-y-8">
 
-                                {sections.map(section => (
-                                    <SortableRulesSection
-                                        key={section.id}
-                                        id={section.id}
-                                        editMode={editMode && hasRole('admin')}
-                                    >
-                                        <div
-                                            ref={el => sectionRefs.current[section.id] = el}
-                                            className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden"
+                        {/* Section 1: Cenni Principali */}
+                        <div ref={el => sectionRefs.current[-1] = el} className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20">
+                            <div className="text-center mb-8">
+                                {editMode && hasRole('admin') ? (
+                                    <input
+                                        type="text"
+                                        value={cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}
+                                        onChange={(e) => setCenniPrincipali(prev => ({ ...prev, title: e.target.value }))}
+                                        className="text-3xl font-bold text-pl-teal bg-transparent border-b border-pl-pink/30 focus:outline-none focus:border-pl-pink text-center w-full"
+                                    />
+                                ) : (
+                                    <h2 className="text-3xl font-bold text-pl-teal">{cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}</h2>
+                                )}
+                            </div>
+                            <div className="text-gray-200 leading-relaxed space-y-4">
+                                <EditableText
+                                    value={cenniPrincipali.mainText}
+                                    onChange={(val: string) => setCenniPrincipali(prev => ({ ...prev, mainText: val }))}
+                                    editMode={editMode}
+                                    multiline={true}
+                                    dataField="mainText"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Other Sections with Drag and Drop */}
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext
+                                items={sections.map(s => s.id)}
+                                strategy={verticalListSortingStrategy}
+                                disabled={!editMode || !hasRole('admin')}
+                            >
+                                <div className="space-y-4">
+                                    {editMode && hasRole('admin') && (
+                                        <button
+                                            onClick={addSection}
+                                            className="w-full flex items-center justify-center gap-2 py-3 bg-pl-teal/20 hover:bg-pl-teal/30 rounded-xl text-white border border-pl-teal/50 transition"
+                                        >
+                                            <Plus size={20} />
+                                            Aggiungi Sezione
+                                        </button>
+                                    )}
+
+                                    {sections.map(section => (
+                                        <SortableRulesSection
+                                            key={section.id}
+                                            id={section.id}
+                                            editMode={editMode && hasRole('admin')}
                                         >
                                             <div
-                                                className="flex items-center justify-between p-6 cursor-pointer hover:bg-white/5 transition"
-                                                onClick={() => toggleSection(section.id)}
+                                                ref={el => sectionRefs.current[section.id] = el}
+                                                className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden"
                                             >
-                                                {editMode && hasRole('admin') ? (
-                                                    <input
-                                                        type="text"
-                                                        value={section.title}
-                                                        onChange={e => updateSection(section.id, 'title', e.target.value)}
-                                                        onClick={e => e.stopPropagation()}
-                                                        className="flex-1 text-xl font-bold text-white bg-transparent border-b border-pl-pink/30 focus:outline-none focus:border-pl-pink text-center"
-                                                    />
-                                                ) : (
-                                                    <h3 className="flex-1 text-xl font-bold text-white text-center">{section.title}</h3>
-                                                )}
-                                                <ChevronDown
-                                                    size={24}
-                                                    className={`text-gray-400 transition-transform ml-4 ${activeSection === section.id ? 'rotate-180' : ''}`}
-                                                />
-                                                {editMode && hasRole('admin') && (
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); removeSection(section.id); }}
-                                                        className="ml-2 p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-400 border border-red-500/50 transition"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
-                                                )}
-                                            </div>
-
-                                            {activeSection === section.id && (
-                                                <div className="p-6 pt-0 border-t border-white/10">
-                                                    <div className="text-gray-200 leading-relaxed space-y-3">
-                                                        <EditableText
-                                                            value={section.content}
-                                                            onChange={(val: string) => updateSection(section.id, 'content', val)}
-                                                            editMode={editMode}
-                                                            multiline={true}
-                                                            dataField={`section-${section.id}`}
+                                                <div
+                                                    className="flex items-center justify-between p-6 cursor-pointer hover:bg-white/5 transition"
+                                                    onClick={() => toggleSection(section.id)}
+                                                >
+                                                    {editMode && hasRole('admin') ? (
+                                                        <input
+                                                            type="text"
+                                                            value={section.title}
+                                                            onChange={e => updateSection(section.id, 'title', e.target.value)}
+                                                            onClick={e => e.stopPropagation()}
+                                                            className="flex-1 text-xl font-bold text-white bg-transparent border-b border-pl-pink/30 focus:outline-none focus:border-pl-pink text-center"
                                                         />
-                                                    </div>
-                                                    {openedFromIndex && activeSection === section.id && (
+                                                    ) : (
+                                                        <h3 className="flex-1 text-xl font-bold text-white text-center">{section.title}</h3>
+                                                    )}
+                                                    <ChevronDown
+                                                        size={24}
+                                                        className={`text-gray-400 transition-transform ml-4 ${activeSection === section.id ? 'rotate-180' : ''}`}
+                                                    />
+                                                    {editMode && hasRole('admin') && (
                                                         <button
-                                                            onClick={scrollToIndex}
-                                                            className="mt-6 flex items-center gap-2 px-4 py-2 bg-pl-teal/20 hover:bg-pl-teal/30 rounded-lg text-white border border-pl-teal/50 transition mx-auto md:hidden"
+                                                            onClick={(e) => { e.stopPropagation(); removeSection(section.id); }}
+                                                            className="ml-2 p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-400 border border-red-500/50 transition"
                                                         >
-                                                            <ArrowUp size={18} />
-                                                            Torna all'Indice
+                                                            <Trash2 size={18} />
                                                         </button>
                                                     )}
                                                 </div>
-                                            )}
-                                        </div>
-                                    </SortableRulesSection>
-                                ))}
-                            </div>
-                        </SortableContext>
-                    </DndContext>
 
-                    <div className="mt-8 text-center text-gray-500 text-sm italic">
-                        <p>⚠️ SOLTANTO i membri del Comitato Decisionale possono modificare questo documento.</p>
+                                                {activeSection === section.id && (
+                                                    <div className="p-6 pt-0 border-t border-white/10">
+                                                        <div className="text-gray-200 leading-relaxed space-y-3">
+                                                            <EditableText
+                                                                value={section.content}
+                                                                onChange={(val: string) => updateSection(section.id, 'content', val)}
+                                                                editMode={editMode}
+                                                                multiline={true}
+                                                                dataField={`section-${section.id}`}
+                                                            />
+                                                        </div>
+                                                        {openedFromIndex && activeSection === section.id && (
+                                                            <button
+                                                                onClick={scrollToIndex}
+                                                                className="mt-6 flex items-center gap-2 px-4 py-2 bg-pl-teal/20 hover:bg-pl-teal/30 rounded-lg text-white border border-pl-teal/50 transition mx-auto md:hidden"
+                                                            >
+                                                                <ArrowUp size={18} />
+                                                                Torna all'Indice
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </SortableRulesSection>
+                                    ))}
+                                </div>
+                            </SortableContext>
+                        </DndContext>
+
+                        <div className="mt-8 text-center text-gray-500 text-sm italic">
+                            <p>⚠️ SOLTANTO i membri del Comitato Decisionale possono modificare questo documento.</p>
+                        </div>
+
+
                     </div>
 
 
+
+                    {/* Archive Modal */}
+                    {selectedArchive && (
+                        <ArchiveModal
+                            archive={selectedArchive}
+                            onClose={() => setSelectedArchive(null)}
+                        />
+                    )}
+
+                    {/* Text Formatting Toolbar - Fixed Position (Global) */}
+                    {editMode && hasRole('admin') && (
+                        <TextFormattingToolbar
+                            visible={showToolbar}
+                            onFormat={handleFormat}
+                            onUndo={handleUndo}
+                            canUndo={undoHistory.length > 0}
+                        />
+                    )}
                 </div>
-
-
-
-                {/* Archive Modal */}
-                {selectedArchive && (
-                    <ArchiveModal
-                        archive={selectedArchive}
-                        onClose={() => setSelectedArchive(null)}
-                    />
-                )}
-
-                {/* Text Formatting Toolbar - Fixed Position (Global) */}
-                {editMode && hasRole('admin') && (
-                    <TextFormattingToolbar
-                        visible={showToolbar}
-                        onFormat={handleFormat}
-                        onUndo={handleUndo}
-                        canUndo={undoHistory.length > 0}
-                    />
-                )}
             </div>
         </div>
     );
