@@ -397,10 +397,6 @@ export function Rules() {
                             </SortableContext>
                         </DndContext>
 
-                        <div className="mt-8 text-center text-gray-500 text-sm italic">
-                            <p>⚠️ SOLTANTO i membri del Comitato Decisionale possono modificare questo documento.</p>
-                        </div>
-
 
                     </div>
 
