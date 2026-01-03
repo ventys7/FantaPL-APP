@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Defiant SPA</title>
+    <script type="text/javascript">
+      // Basic SPA Single Page Application for GitHub Pages
+      // This script takes the current URL and redirects the browser to the
+      // index.html page with the path and query string as a query parameter.
+      var pathSegmentsToKeep = 1;
+
+      var l = window.location;
+      
+      // Reconstitute the path from the current location
+      // If we are at /FantaPL-APP/dashboard, l.pathname is /FantaPL-APP/dashboard
+      // We want to redirect to /FantaPL-APP/?p=/dashboard
+      
+      var path = l.pathname;
+      var repo = '/FantaPL-APP';
+      
+      if (path.startsWith(repo)) {
+         path = path.substring(repo.length);
+      }
+      
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        repo + '/?p=' + path + (l.search ? '&q=' + l.search.slice(1) : '') +
+        l.hash
+      );
+    </script>
+  </head>
+  <body>
+  </body>
+</html>

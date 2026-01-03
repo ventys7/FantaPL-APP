@@ -3,6 +3,15 @@
 @tailwind utilities;
 
 @layer base {
+
+  html,
+  body,
+  #root {
+    @apply h-full overflow-hidden;
+    overscroll-behavior-y: none;
+    /* Prevent elastic bounce */
+  }
+
   body {
     @apply bg-pl-dark text-white font-sans antialiased;
   }
@@ -12,12 +21,15 @@
 ::-webkit-scrollbar {
   width: 8px;
 }
+
 ::-webkit-scrollbar-track {
   @apply bg-pl-dark;
 }
+
 ::-webkit-scrollbar-thumb {
   @apply bg-pl-hover rounded-full;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-pl-purple;
 }
