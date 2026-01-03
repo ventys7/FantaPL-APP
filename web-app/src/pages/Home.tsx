@@ -41,7 +41,7 @@ export const Home = () => {
 
                     <div className="mt-1 md:mt-4 max-w-xs md:max-w-2xl mx-auto">
                         <p className="text-sm md:text-xl text-gray-300 font-light italic leading-tight">
-                            L'intensità del calcio inglese con le regole del fantacalcio italiano
+                            L'intensità del calcio inglese <br className="md:hidden" /> con le regole del fantacalcio italiano
                         </p>
                     </div>
                 </div>
