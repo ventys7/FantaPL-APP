@@ -1,7 +1,7 @@
 import { Client, Account, Databases, Storage, Functions } from 'appwrite';
 import { logger } from './logger';
 
-const client = new Client();
+export const client = new Client();
 
 // Hardcoded for debugging - replace with env vars once working
 const endpoint = 'https://fra.cloud.appwrite.io/v1';

@@ -1,0 +1,9 @@
+{
+  "name": "admin-password-reset",
+  "version": "1.0.0",
+  "description": "Admin function to reset user passwords",
+  "main": "src/main.js",
+  "dependencies": {
+    "node-appwrite": "^14.0.0"
+  }
+}

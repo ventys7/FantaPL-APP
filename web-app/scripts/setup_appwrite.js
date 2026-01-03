@@ -17,7 +17,11 @@ const ATTRIBUTES = {
     app_settings: [
         { key: 'key', type: 'string', size: 255, required: true },
         { key: 'value', type: 'string', size: 1000, required: true }, // Storing value as string/JSON
-        { key: 'description', type: 'string', size: 1000, required: false }
+        { key: 'description', type: 'string', size: 1000, required: false },
+        // Rules section fields
+        { key: 'cenni_main_text', type: 'string', size: 100000, required: false },
+        { key: 'cenni_partecipanti', type: 'string', size: 10000, required: false },
+        { key: 'sections_json', type: 'string', size: 500000, required: false }
     ],
     real_teams: [
         { key: 'name', type: 'string', size: 255, required: true },
@@ -52,6 +56,13 @@ const ATTRIBUTES = {
         { key: 'pen_saved', type: 'integer', required: false, default: 0 },
         { key: 'clean_sheet', type: 'boolean', required: false, default: false },
         { key: 'own_goals', type: 'integer', required: false, default: 0 }
+    ],
+    rules_archive: [
+        { key: 'season', type: 'string', size: 20, required: true }, // e.g. "2024/25"
+        { key: 'archived_at', type: 'datetime', required: true },
+        { key: 'cenni_main_text', type: 'string', size: 100000, required: false },
+        { key: 'cenni_partecipanti', type: 'string', size: 10000, required: false },
+        { key: 'sections_json', type: 'string', size: 500000, required: false }
     ]
 };
 

@@ -3,7 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocat
 import { logger } from './lib/logger';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { Navbar } from './components/Navbar';
+import { Navbar } from './components/Navbar'; // Keep for now or remove if unused. Layout uses it.
+import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { Dashboard } from './pages/Dashboard';
 import { Fixtures } from './pages/Fixtures';
@@ -17,6 +18,7 @@ const VoteEntry = lazy(() => import('./pages/VoteEntry').then(module => ({ defau
 const ForceChangePassword = lazy(() => import('./pages/ForceChangePassword').then(module => ({ default: module.ForceChangePassword })));
 const AdminLayout = lazy(() => import('./components/AdminLayout').then(module => ({ default: module.AdminLayout })));
 const ParticipantManagement = lazy(() => import('./pages/ParticipantManagement').then(module => ({ default: module.ParticipantManagement })));
+const AdminSystem = lazy(() => import('./pages/AdminSystem').then(module => ({ default: module.AdminSystem })));
 
 function AdminIndex() {
     const { hasRole } = useAuth();
@@ -63,44 +65,42 @@ function App() {
             <Router basename="/FantaPL-APP/">
                 <RedirectHandler />
                 <ErrorBoundary>
-                    <div className="h-[100dvh] w-full bg-pl-dark text-white selection:bg-pl-green selection:text-pl-dark flex flex-col overflow-hidden">
-                        <Navbar />
-                        <main className="flex-1 flex flex-col relative overflow-y-auto overflow-x-hidden scrollbar-hide">
-                            <Suspense fallback={<LoadingSpinner />}>
-                                <Routes>
-                                    <Route path="/" element={<Home />} />
-                                    <Route path="/dashboard" element={
-                                        <ProtectedRoute>
-                                            <Dashboard />
-                                        </ProtectedRoute>
-                                    } />
-                                    <Route path="/fixtures" element={<Fixtures />} />
-                                    <Route path="/rules" element={<Rules />} />
-                                    <Route path="/login" element={<Login />} />
-                                    <Route path="/change-password" element={
-                                        <ProtectedRoute>
-                                            <ForceChangePassword />
-                                        </ProtectedRoute>
-                                    } />
+                    <Suspense fallback={<LoadingSpinner />}>
+                        <Routes>
+                            <Route element={<Layout />}>
+                                <Route path="/" element={<Home />} />
+                                <Route path="/dashboard" element={
+                                    <ProtectedRoute>
+                                        <Dashboard />
+                                    </ProtectedRoute>
+                                } />
+                                <Route path="/fixtures" element={<Fixtures />} />
+                                <Route path="/rules" element={<Rules />} />
+                                <Route path="/login" element={<Login />} />
+                                <Route path="/change-password" element={
+                                    <ProtectedRoute>
+                                        <ForceChangePassword />
+                                    </ProtectedRoute>
+                                } />
 
-                                    {/* Admin Routes */}
-                                    <Route path="/admin" element={
-                                        <ProtectedRoute requiredRole="helper">
-                                            <AdminLayout />
+                                {/* Admin Routes */}
+                                <Route path="/admin" element={
+                                    <ProtectedRoute requiredRole="helper">
+                                        <AdminLayout />
+                                    </ProtectedRoute>
+                                }>
+                                    <Route index element={<AdminIndex />} />
+                                    <Route path="participants" element={
+                                        <ProtectedRoute requiredRole="admin">
+                                            <ParticipantManagement />
                                         </ProtectedRoute>
-                                    }>
-                                        <Route index element={<AdminIndex />} />
-                                        <Route path="participants" element={
-                                            <ProtectedRoute requiredRole="admin">
-                                                <ParticipantManagement />
-                                            </ProtectedRoute>
-                                        } />
-                                        <Route path="votes" element={<VoteEntry />} />
-                                    </Route>
-                                </Routes>
-                            </Suspense>
-                        </main>
-                    </div>
+                                    } />
+                                    <Route path="votes" element={<VoteEntry />} />
+                                    <Route path="system" element={<AdminSystem />} />
+                                </Route>
+                            </Route>
+                        </Routes>
+                    </Suspense>
                 </ErrorBoundary>
             </Router>
         </AuthProvider>
