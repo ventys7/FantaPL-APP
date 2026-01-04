@@ -1,4 +1,4 @@
-import { Client, Databases, ID, Query } from 'node-appwrite';
+import { Client, Databases, Query } from 'node-appwrite';
 import axios from 'axios';
 
 // Environment variables
@@ -7,12 +7,11 @@ const API_KEY = process.env.APPWRITE_API_KEY; // Appwrite API Key
 const DATABASE_ID = process.env.DB_ID || 'fantapl_db';
 const FIXTURES_COLLECTION_ID = process.env.COLL_FIXTURES || 'fixtures';
 const COLL_TEAMS = process.env.COLL_TEAMS || 'real_teams';
-const FOOTBALL_DATA_KEY = process.env.RAPIDAPI_KEY;
 
-// Football-Data.org Configuration
-const API_BASE_URL = 'https://api.football-data.org/v4';
-const COMPETITION_ID = 'PL'; // Premier League
-const SEASON = 2025; // 2025-2026 season (current)
+// FotMob Configuration
+const FOTMOB_BASE_URL = 'https://www.fotmob.com/api';
+const FOTMOB_LEAGUE_ID = 47; // Premier League
+const TEAM_LOGO_BASE_URL = 'https://images.fotmob.com/image_resources/logo/teamlogo';
 
 // Appwrite Helper
 const getClient = () => {
@@ -23,78 +22,87 @@ const getClient = () => {
     return new Databases(client);
 };
 
-// --- HELPER: Integrity Check (Self-Healing) ---
-async function ensureTeamsExist(db, log, error) {
-    try {
-        const existing = await db.listDocuments(DATABASE_ID, COLL_TEAMS, [Query.limit(1)]);
-        if (existing.total < 20) {
-            log(`[Self-Healing] Only ${existing.total}/20 teams found. Triggering Auto-Sync...`);
-            await syncTeams(db, log, error);
-        }
-    } catch (e) {
-        log(`[Self-Healing] Check failed: ${e.message}`);
+// --- HELPER: Appwrite Client Initialization ---
+const apiClient = axios.create({
+    baseURL: FOTMOB_BASE_URL,
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.fotmob.com/',
+        'Accept': 'application/json, text/plain, */*'
     }
+});
+
+// --- HELPER: Fetch League Data ---
+async function fetchLeagueData(log) {
+    log('Fetching league data from FotMob...');
+    const response = await apiClient.get('/leagues', {
+        params: { id: FOTMOB_LEAGUE_ID, tab: 'matches' }
+    });
+
+    const data = response.data;
+
+    // Normalize response structure
+    let allMatches = [];
+    if (data.fixtures && data.fixtures.allMatches) {
+        allMatches = data.fixtures.allMatches;
+    } else if (data.matches) {
+        allMatches = Array.isArray(data.matches) ? data.matches : (data.matches.allMatches || []);
+    } else if (data.allMatches) {
+        allMatches = data.allMatches;
+    }
+
+    log(`Retrieved ${allMatches.length} matches from FotMob.`);
+    return allMatches;
 }
 
 // --- LOGIC: Sync Teams ---
-async function syncTeams(db, log, error, season = SEASON) {
-    log(`Fetching teams from Football-Data.org for season ${season}...`);
-
+// We extract teams from the matches list to ensure IDs are consistent with fixtures
+async function syncTeams(db, log, error) {
     try {
-        const response = await axios.get(`${API_BASE_URL}/competitions/${COMPETITION_ID}/teams`, {
-            headers: { 'X-Auth-Token': FOOTBALL_DATA_KEY },
-            params: { season: season }
+        const matches = await fetchLeagueData(log);
+        const teamsMap = new Map();
+
+        // Collect unique teams
+        matches.forEach(m => {
+            if (m.home) {
+                teamsMap.set(m.home.id, { id: m.home.id, name: m.home.name });
+            }
+            if (m.away) {
+                teamsMap.set(m.away.id, { id: m.away.id, name: m.away.name });
+            }
         });
 
-        const teams = response.data.teams;
-        log(`Found ${teams.length} teams.`);
+        log(`Found ${teamsMap.size} unique teams.`);
 
-        // CUSTOM MAPPING: Override names to be readable but < 10 chars (DB Limit)
-        // This solves "Wolverhampton" (13 chars) vs DB Limit (10 chars), satisfying user request for "Wolves"
-        const SHORT_NAME_OVERRIDES = {
-            'Wolverhampton Wanderers FC': 'Wolves',
-            'Brighton & Hove Albion FC': 'Brighton',
-            'AFC Bournemouth': 'B\'mouth',
-            'Crystal Palace FC': 'Palace',
-            'Aston Villa FC': 'Villa',
-            'Tottenham Hotspur FC': 'Tottenham',
-            'Nottingham Forest FC': 'Forest',
-            'West Ham United FC': 'West Ham',
-            'Newcastle United FC': 'Newcastle',
-            'Sheffield United FC': 'Sheff Utd',
-            'Leeds United FC': 'Leeds',
-            'Leicester City FC': 'Leicester',
-            'Southampton FC': 'Soton',
-            'Ipswich Town FC': 'Ipswich'
+        // Manual Short Name Overrides (Optional, for better UI)
+        const SHORT_NAMES = {
+            'Wolverhampton Wanderers': 'Wolves',
+            'Brighton & Hove Albion': 'Brighton',
+            'Nottingham Forest': 'Forest',
+            'Sheffield United': 'Sheff Utd',
+            'West Ham United': 'West Ham',
+            'Newcastle United': 'Newcastle',
+            'Tottenham Hotspur': 'Tottenham',
+            'Manchester United': 'Man Utd',
+            'Manchester City': 'Man City',
+            'Leicester City': 'Leicester',
+            'Ipswich Town': 'Ipswich'
         };
 
         let processed = 0;
         let errors = 0;
-        let errorDetails = [];
 
-        for (const team of teams) {
-            const docId = `team_${team.id}`;
-
-            // PRIORITY: Override List > API Short Name > API Name > 3-letter fallback
-            let shortName = SHORT_NAME_OVERRIDES[team.name] || team.shortName || team.tla || 'UNK';
-
-            // If still too long for DB (10 chars) despite overrides, fallback to TLA (3 chars)
-            if (shortName.length > 10) {
-                shortName = team.tla || team.name?.substring(0, 3)?.toUpperCase() || 'UNK';
-            }
+        for (const [teamId, team] of teamsMap) {
+            const docId = `team_${teamId}`;
+            const shortName = SHORT_NAMES[team.name] || team.name.substring(0, 10); // Simple fallback
 
             const teamData = {
                 name: team.name,
                 short_name: shortName,
-                logo_url: team.crest
+                logo_url: `${TEAM_LOGO_BASE_URL}/${teamId}.png`
             };
 
-            // 1. Clean Data
-            if (!teamData.logo_url) delete teamData.logo_url;
-
-            // 2. Try Update/Insert with Fallback
             try {
-                // Try Upsert
                 try {
                     await db.updateDocument(DATABASE_ID, COLL_TEAMS, docId, teamData);
                 } catch (updateErr) {
@@ -104,107 +112,84 @@ async function syncTeams(db, log, error, season = SEASON) {
                         throw updateErr;
                     }
                 }
+                processed++;
             } catch (err) {
-                // RETRY STRATEGY: If validation failed (likely URL), retry without logo
-                if (teamData.logo_url) {
-                    delete teamData.logo_url;
-                    try {
-                        try {
-                            await db.updateDocument(DATABASE_ID, COLL_TEAMS, docId, teamData);
-                        } catch (updateErr) {
-                            if (updateErr.code === 404) {
-                                await db.createDocument(DATABASE_ID, COLL_TEAMS, docId, teamData);
-                            } else {
-                                throw updateErr;
-                            }
-                        }
-                        log(`Recovered team ${team.name} by removing invalid logo.`);
-                        processed++;
-                        continue; // Skip error increment
-                    } catch (retryErr) {
-                        errorDetails.push(`${team.name}: ${retryErr.message}`);
-                        errors++;
-                    }
-                } else {
-                    errorDetails.push(`${team.name}: ${err.message}`);
-                    errors++;
-                }
+                error(`Failed to sync team ${team.name} (${docId}): ${err.message}`);
+                errors++;
             }
-            processed++;
         }
 
-        return { success: true, processed, errors, details: errorDetails };
+        return { success: true, processed, errors };
     } catch (err) {
-        error(`API Error: ${err.message}`);
+        error(`Sync Teams Error: ${err.message}`);
         throw err;
     }
 }
 
 // --- LOGIC: Sync Fixtures ---
 async function syncFixtures(db, log, error) {
-    log('Fetching fixtures from Football-Data.org...');
-
     try {
-        const response = await axios.get(`${API_BASE_URL}/competitions/${COMPETITION_ID}/matches`, {
-            headers: {
-                'X-Auth-Token': FOOTBALL_DATA_KEY
-            },
-            params: {
-                season: SEASON
-            }
-        });
-
-        const matches = response.data.matches;
-        log(`Found ${matches.length} matches.`);
-
+        const matches = await fetchLeagueData(log);
         let processed = 0;
         let errors = 0;
 
         for (const match of matches) {
-            const docId = `pl_${match.id}`; // Custom ID strategy
+            const docId = `match_${match.id}`; // New ID format for FotMob
 
             // Map Status
-            let status = match.status; // SCHEDULED, TIMED, IN_PLAY, PAUSED, FINISHED
+            let status = 'SCHEDULED';
+            if (match.status) {
+                if (match.status.finished) {
+                    status = 'FINISHED';
+                } else if (match.status.started || match.status.live) {
+                    status = 'IN_PLAY';
+                } else if (match.status.cancelled) {
+                    status = 'POSTPONED'; // Or handle as desired
+                }
+            }
 
-            // Map Scores (Handle live/finished)
-            let homeScore = null;
-            let awayScore = null;
+            // Map Scores
+            // FotMob structure: status.scoreStr (e.g. "2 - 1") or separate fields?
+            // Usually match.home.score and match.away.score are present in the list view
+            let homeScore = 0;
+            let awayScore = 0;
 
-            if (status === 'FINISHED' || status === 'IN_PLAY' || status === 'PAUSED') {
-                homeScore = match.score.fullTime.home ?? match.score.halfTime.home ?? 0;
-                awayScore = match.score.fullTime.away ?? match.score.halfTime.away ?? 0;
+            // Check if score is available in the object
+            // If match is not started, scores might be undefined or null
+            // We only trust scores if started/finished
+            if (status === 'IN_PLAY' || status === 'FINISHED') {
+                // Try parsing from status.scoreStr if home.score is missing
+                // Or use match.home.score (if numeric)
+                const hScore = match.home.score;
+                const aScore = match.away.score;
+
+                homeScore = (hScore !== undefined && hScore !== null) ? parseInt(hScore) : 0;
+                awayScore = (aScore !== undefined && aScore !== null) ? parseInt(aScore) : 0;
             }
 
             const fixtureData = {
                 external_id: match.id,
-                gameweek: match.matchday || 0,
-                home_team_id: `team_${match.homeTeam.id}`,
-                away_team_id: `team_${match.awayTeam.id}`,
-                date: match.utcDate,
+                gameweek: match.round || 0, // "round": 1 or "roundName": "Round 1"
+                home_team_id: `team_${match.home.id}`,
+                away_team_id: `team_${match.away.id}`,
+                date: match.status?.utcTime || match.time || new Date().toISOString(),
                 status: status,
                 home_score: homeScore,
                 away_score: awayScore,
-                minute: match.minute || 0,
-                season: SEASON
+                minute: match.status?.liveTime ? parseInt(match.status.liveTime) : 0,
+                season: 2025 // Static for now, or derive
             };
 
+            // Fix for "round" sometimes being an object or string
+            if (typeof match.round === 'object') fixtureData.gameweek = 0;
+            // Better parsing for round could go here if needed
+
             try {
-                // Upsert logic
-                await db.updateDocument(
-                    DATABASE_ID,
-                    FIXTURES_COLLECTION_ID,
-                    docId,
-                    fixtureData
-                );
+                await db.updateDocument(DATABASE_ID, FIXTURES_COLLECTION_ID, docId, fixtureData);
             } catch (err) {
                 if (err.code === 404) {
                     try {
-                        await db.createDocument(
-                            DATABASE_ID,
-                            FIXTURES_COLLECTION_ID,
-                            docId,
-                            fixtureData
-                        );
+                        await db.createDocument(DATABASE_ID, FIXTURES_COLLECTION_ID, docId, fixtureData);
                     } catch (createErr) {
                         error(`Failed to create fixture ${docId}: ${createErr.message}`);
                         errors++;
@@ -219,106 +204,73 @@ async function syncFixtures(db, log, error) {
 
         return { success: true, processed, errors };
     } catch (err) {
-        error(`API Error: ${err.message}`);
-        if (err.response) {
-            error(`API Response: ${JSON.stringify(err.response.data)}`);
-        }
+        error(`Sync Fixtures Error: ${err.message}`);
         throw err;
     }
 }
 
-// --- LOGIC: Fetch Live Matches (IN_PLAY only) ---
-async function fetchLiveMatches(db, log, error) {
-    // SELF-HEALING: Check if teams are missing before updating matches
-    // This allows the cron job to auto-fix missing teams without user intervention
-    await ensureTeamsExist(db, log, error);
-
-    log('Fetching LIVE matches from Football-Data.org...');
-
+// --- LOGIC: Live / Today Updates ---
+// Reuses the main fetch but filters for efficiency if needed. 
+// Since we fetch all matches in one lightweight request, we can just filter in memory.
+async function syncLiveOrToday(db, log, error, mode = 'LIVE') {
     try {
-        const response = await axios.get(`${API_BASE_URL}/competitions/${COMPETITION_ID}/matches`, {
-            headers: { 'X-Auth-Token': FOOTBALL_DATA_KEY },
-            params: { status: 'LIVE' }
-        });
+        const matches = await fetchLeagueData(log);
+        const today = new Date().toISOString().split('T')[0];
 
-        const matches = response.data.matches || [];
-        log(`Found ${matches.length} live matches.`);
+        let targetMatches = [];
 
-        let processed = 0;
-        let errors = 0;
-
-        for (const match of matches) {
-            const docId = `pl_${match.id}`;
-
-            const fixtureData = {
-                status: match.status,
-                home_score: match.score.fullTime.home ?? match.score.halfTime.home ?? 0,
-                away_score: match.score.fullTime.away ?? match.score.halfTime.away ?? 0,
-                minute: match.minute || null // Try to update minute if available
-            };
-
-            try {
-                await db.updateDocument(DATABASE_ID, FIXTURES_COLLECTION_ID, docId, fixtureData);
-                processed++;
-            } catch (err) {
-                error(`Failed to update live fixture ${docId}: ${err.message}`);
-                errors++;
-            }
+        if (mode === 'LIVE') {
+            targetMatches = matches.filter(m => m.status && (m.status.live || (m.status.started && !m.status.finished)));
+        } else if (mode === 'TODAY') {
+            targetMatches = matches.filter(m => {
+                const mDate = m.status?.utcTime || m.time;
+                return mDate && mDate.startsWith(today);
+            });
         }
 
-        return { success: true, action: 'LIVE_UPDATES', liveCount: matches.length, processed, errors };
-    } catch (err) {
-        error(`API Error: ${err.message}`);
-        throw err;
-    }
-}
-
-// --- LOGIC: Fetch Today's Matches ---
-async function fetchTodayMatches(db, log, error) {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    log(`Fetching matches for today (${today})...`);
-
-    try {
-        const response = await axios.get(`${API_BASE_URL}/competitions/${COMPETITION_ID}/matches`, {
-            headers: { 'X-Auth-Token': FOOTBALL_DATA_KEY },
-            params: { dateFrom: today, dateTo: today }
-        });
-
-        const matches = response.data.matches || [];
-        log(`Found ${matches.length} matches today.`);
+        log(`Docs to update for ${mode}: ${targetMatches.length}`);
 
         let processed = 0;
         let errors = 0;
 
-        for (const match of matches) {
-            const docId = `pl_${match.id}`;
+        for (const match of targetMatches) {
+            const docId = `match_${match.id}`;
 
-            let homeScore = null;
-            let awayScore = null;
-            if (match.status === 'FINISHED' || match.status === 'IN_PLAY' || match.status === 'PAUSED') {
-                homeScore = match.score.fullTime.home ?? match.score.halfTime.home ?? 0;
-                awayScore = match.score.fullTime.away ?? match.score.halfTime.away ?? 0;
+            // Recalculate status/score/time
+            let status = 'SCHEDULED';
+            if (match.status) {
+                if (match.status.finished) status = 'FINISHED';
+                else if (match.status.started || match.status.live) status = 'IN_PLAY';
             }
 
-            const fixtureData = {
-                status: match.status,
+            let homeScore = 0;
+            let awayScore = 0;
+            const hScore = match.home.score;
+            const aScore = match.away.score;
+            homeScore = (hScore !== undefined && hScore !== null) ? parseInt(hScore) : 0;
+            awayScore = (aScore !== undefined && aScore !== null) ? parseInt(aScore) : 0;
+
+            const updateData = {
+                status: status,
                 home_score: homeScore,
                 away_score: awayScore,
-                minute: match.minute || null
+                minute: match.status?.liveTime ? parseInt(match.status.liveTime) : 0,
             };
 
             try {
-                await db.updateDocument(DATABASE_ID, FIXTURES_COLLECTION_ID, docId, fixtureData);
+                await db.updateDocument(DATABASE_ID, FIXTURES_COLLECTION_ID, docId, updateData);
                 processed++;
             } catch (err) {
-                error(`Failed to update today fixture ${docId}: ${err.message}`);
+                // If 404, we ignore for live updates (should have been synced by main sync)
+                // Or we can log it
+                // error(`Live update 404 for ${docId}: ${err.message}`);
                 errors++;
             }
         }
 
-        return { success: true, action: 'TODAY_MATCHES', todayCount: matches.length, processed, errors };
+        return { success: true, action: mode, count: targetMatches.length, processed, errors };
     } catch (err) {
-        error(`API Error: ${err.message}`);
+        error(`${mode} Sync Error: ${err.message}`);
         throw err;
     }
 }
@@ -326,7 +278,7 @@ async function fetchTodayMatches(db, log, error) {
 
 // --- MAIN HANDLER ---
 export default async ({ req, res, log, error }) => {
-    log('Function started (Football-Data.org version)');
+    log('Function started (FotMob Integration 🚀)');
 
     // Parse Body
     let body = {};
@@ -342,14 +294,7 @@ export default async ({ req, res, log, error }) => {
     }
 
     const action = body.action || 'SYNC_FIXTURES';
-    const season = body.season || SEASON; // Allow override
-
-    log(`Action: ${action}, Season: ${season}`);
-
-    if (!FOOTBALL_DATA_KEY) {
-        error('RAPIDAPI_KEY (used as Auth Token) is missing');
-        return res.json({ success: false, error: 'Configuration Error: Key missing' }, 500);
-    }
+    log(`Action: ${action}`);
 
     if (!API_KEY) {
         error('APPWRITE_API_KEY is missing');
@@ -361,17 +306,17 @@ export default async ({ req, res, log, error }) => {
     try {
         let result;
         switch (action) {
+            case 'SYNC_TEAMS':
+                result = await syncTeams(db, log, error);
+                break;
             case 'SYNC_FIXTURES':
                 result = await syncFixtures(db, log, error);
                 break;
             case 'LIVE_UPDATES':
-                result = await fetchLiveMatches(db, log, error);
+                result = await syncLiveOrToday(db, log, error, 'LIVE');
                 break;
             case 'TODAY_MATCHES':
-                result = await fetchTodayMatches(db, log, error);
-                break;
-            case 'SYNC_TEAMS':
-                result = await syncTeams(db, log, error, season);
+                result = await syncLiveOrToday(db, log, error, 'TODAY');
                 break;
             default:
                 return res.json({ success: false, error: 'Unknown Action' }, 400);
@@ -383,3 +328,4 @@ export default async ({ req, res, log, error }) => {
         return res.json({ success: false, error: err.message }, 500);
     }
 };
+
