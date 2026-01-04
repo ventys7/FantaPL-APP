@@ -105,6 +105,8 @@ export default async ({ req, res, log, error }) => {
         const content = detailsResp.data.content;
         if (!content) return res.json({ success: false, message: `No content for match ${fotmobId}` });
 
+
+
         const lineupsObj = content.lineup;
         const eventsRaw = content.matchFacts?.events?.events;
 
@@ -121,40 +123,138 @@ export default async ({ req, res, log, error }) => {
             };
         };
 
+
+
         const homeLineupData = lineupsObj?.homeTeam ? {
             formation: lineupsObj.homeTeam.formation,
             lineup: (lineupsObj.homeTeam.starters || []).map(mapFotMobPlayer),
-            bench: (lineupsObj.homeTeam.bench || []).map(mapFotMobPlayer)
+            bench: (lineupsObj.homeTeam.bench || lineupsObj.homeTeam.subs || []).map(mapFotMobPlayer)
         } : null;
 
         const awayLineupData = lineupsObj?.awayTeam ? {
             formation: lineupsObj.awayTeam.formation,
             lineup: (lineupsObj.awayTeam.starters || []).map(mapFotMobPlayer),
-            bench: (lineupsObj.awayTeam.bench || []).map(mapFotMobPlayer)
+            bench: (lineupsObj.awayTeam.bench || lineupsObj.awayTeam.subs || []).map(mapFotMobPlayer)
         } : null;
+
+        // Process events - special handling for substitutions which have swap array
+        const processedEvents = [];
+
+
+
+        (eventsRaw || []).forEach(e => {
+            if (e.type === 'Substitution' && Array.isArray(e.swap) && e.swap.length >= 2) {
+                // Player IN (swap[0])
+                processedEvents.push({
+                    type: 'SubIn',
+                    detail: 'SubIn',
+                    time: { elapsed: e.time, extra: e.overloadTime },
+                    player: { id: parseInt(e.swap[0].id), name: e.swap[0].name },
+                    team: { name: e.isHome ? homeTeamName : awayTeamName },
+                    isHome: e.isHome
+                });
+                // Player OUT (swap[1])
+                processedEvents.push({
+                    type: 'SubOut',
+                    detail: 'SubOut',
+                    time: { elapsed: e.time, extra: e.overloadTime },
+                    player: { id: parseInt(e.swap[1].id), name: e.swap[1].name },
+                    team: { name: e.isHome ? homeTeamName : awayTeamName },
+                    isHome: e.isHome
+                });
+            } else if (e.type === 'Goal') {
+                // Check for own goal
+                const isOwnGoal = e.ownGoal === true;
+
+                // Goal event
+                processedEvents.push({
+                    type: isOwnGoal ? 'OwnGoal' : 'Goal',
+                    detail: isOwnGoal ? 'OwnGoal' : 'Goal',
+                    time: { elapsed: e.time, extra: e.overloadTime },
+                    player: e.player ? { id: e.player.id, name: e.player.name } : null,
+                    team: { name: e.isHome ? homeTeamName : awayTeamName },
+                    isHome: e.isHome,
+                    isOwnGoal: isOwnGoal
+                });
+                // Create assist event (only if not own goal)
+                if (e.assistPlayerId && !isOwnGoal) {
+                    const assistName = e.assistInput || (e.assistStr ? e.assistStr.replace('assist by ', '') : 'Unknown');
+                    processedEvents.push({
+                        type: 'Assist',
+                        detail: 'Assist',
+                        time: { elapsed: e.time, extra: e.overloadTime },
+                        player: { id: e.assistPlayerId, name: assistName },
+                        team: { name: e.isHome ? homeTeamName : awayTeamName },
+                    });
+                }
+            } else if (e.type === 'Card') {
+                // Track yellow cards per player to detect second yellow
+                const playerId = e.player?.id;
+
+                // Count how many yellows this player already has
+                const existingYellows = processedEvents.filter(
+                    ev => ev.type === 'Card' && ev.detail === 'Yellow' && ev.player?.id === playerId
+                ).length;
+
+                // If this is the second yellow, mark it as YellowRed
+                const isSecondYellow = e.card === 'Yellow' && existingYellows >= 1;
+                const cardType = isSecondYellow ? 'YellowRed' : e.card;
+
+                processedEvents.push({
+                    type: 'Card',
+                    detail: cardType,
+                    secondYellow: isSecondYellow,
+                    time: { elapsed: e.time, extra: e.overloadTime },
+                    player: e.player ? { id: e.player.id, name: e.player.name } : null,
+                    team: { name: e.isHome ? homeTeamName : awayTeamName },
+                    isHome: e.isHome
+                });
+            } else if (e.type === 'MissedPenalty' || e.type === 'PenaltyMissed') {
+                // Penalty missed by the shooter
+                if (e.player?.id) {
+                    processedEvents.push({
+                        type: 'PenaltyMissed',
+                        detail: 'PenaltyMissed',
+                        time: { elapsed: e.time, extra: e.overloadTime },
+                        player: { id: e.player.id, name: e.player.name },
+                        team: { name: e.isHome ? homeTeamName : awayTeamName },
+                        isHome: e.isHome
+                    });
+                }
+
+                // Find the penalty in shotmap to get keeperId
+                const shotmap = content.shotmap;
+                const penaltyShot = (shotmap?.shots || []).find(
+                    s => s.situation === 'Penalty' && s.playerId === e.player?.id && s.min === e.time
+                );
+
+                if (penaltyShot?.keeperId) {
+                    // Find keeper name from playerStats
+                    const playerStats = content.playerStats;
+                    const keeperStats = playerStats?.[penaltyShot.keeperId];
+                    const keeperName = keeperStats?.name || 'Goalkeeper';
+
+                    processedEvents.push({
+                        type: 'PenaltySaved',
+                        detail: 'PenaltySaved',
+                        time: { elapsed: e.time, extra: e.overloadTime },
+                        player: { id: penaltyShot.keeperId, name: keeperName },
+                        team: { name: !e.isHome ? homeTeamName : awayTeamName },
+                        isHome: !e.isHome
+                    });
+                }
+            }
+            // Ignore AddedTime, Half events
+        });
 
         const lineupsData = {
             home: homeLineupData,
             away: awayLineupData,
-            events: (eventsRaw || []).map(e => ({
-                type: e.type,
-                detail: e.card || (e.type === 'Goal' ? 'Goal' : e.type),
-                time: { elapsed: e.time, extra: e.overloadTime },
-                player: { id: e.player?.id, name: e.player?.name },
-                assist: e.assist ? { id: e.assist.id, name: e.assist.name } : null,
-                team: { name: e.isHome ? homeTeamName : awayTeamName },
-                isHome: e.isHome
-            }))
+            events: processedEvents
         };
 
-        const db = getClient();
-        await db.updateDocument(
-            DATABASE_ID,
-            FIXTURES_COLLECTION_ID,
-            fixtureId,
-            { lineups: JSON.stringify(lineupsData) }
-        );
-
+        // Return lineups directly (no database storage)
+        log(`Returning lineups for ${homeTeamName} vs ${awayTeamName}`);
         return res.json({ success: true, lineups: lineupsData });
 
     } catch (err) {

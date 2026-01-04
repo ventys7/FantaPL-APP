@@ -1,0 +1,13 @@
+{
+    "name": "get_pl_fixtures",
+    "version": "1.0.0",
+    "description": "Proxy to FotMob API for Premier League fixtures",
+    "main": "src/main.js",
+    "type": "module",
+    "dependencies": {
+        "axios": "^1.6.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}

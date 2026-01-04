@@ -71,6 +71,7 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
             const response = JSON.parse(execution.responseBody);
 
             if (response.success && response.lineups) {
+                console.log('📋 Lineups received:', response.lineups);
                 setLineups(response.lineups);
             } else {
                 // If API says "No lineup data", show it
@@ -134,14 +135,39 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                         <div className="flex items-center gap-2">
                             <span className={`font-semibold truncate ${isBench ? 'text-gray-400 group-hover:text-white text-xs' : 'text-sm'}`}>{p.name}</span>
                             {/* Inline Events Icons */}
-                            {events && events.map((e: any, i: number) => (
-                                <div key={i} title={`${e.type} (${e.time.elapsed}')`} className="flex-shrink-0">
-                                    {e.type === 'Goal' && <span className="text-xs">⚽</span>}
-                                    {e.detail === 'Yellow Card' && <div className="w-2 h-3 bg-yellow-400 rounded-[1px]" />}
-                                    {e.detail === 'Red Card' && <div className="w-2 h-3 bg-red-600 rounded-[1px]" />}
-                                    {e.type === 'Sub' && <span className="text-xs text-pl-teal">⇄</span>}
-                                </div>
-                            ))}
+                            {events && events.map((e: any, i: number) => {
+                                // Event types: Goal, OwnGoal, Card, SubIn, SubOut, Assist, PenaltySaved
+                                const isGoal = e.type === 'Goal';
+                                const isOwnGoal = e.type === 'OwnGoal';
+                                const isYellow = e.type === 'Card' && e.detail === 'Yellow' && !e.secondYellow;
+                                const isSecondYellow = e.type === 'Card' && (e.secondYellow || e.detail === 'YellowRed');
+                                const isRed = e.type === 'Card' && e.detail === 'Red' && !e.secondYellow;
+                                const isSubIn = e.type === 'SubIn';
+                                const isSubOut = e.type === 'SubOut';
+                                const isAssist = e.type === 'Assist';
+                                const isPenaltyMissed = e.type === 'PenaltyMissed';
+                                const isPenaltySaved = e.type === 'PenaltySaved';
+
+                                return (
+                                    <div key={i} title={`${e.type} (${e.time?.elapsed}')`} className="flex-shrink-0 flex items-center">
+                                        {isGoal && <span className="text-xs">⚽</span>}
+                                        {isOwnGoal && <span className="text-xs">⚽🔴</span>}
+                                        {isYellow && <div className="w-2 h-3 bg-yellow-400 rounded-[1px]" />}
+                                        {isSecondYellow && (
+                                            <div className="flex">
+                                                <div className="w-2 h-3 bg-yellow-400 rounded-[1px]" />
+                                                <div className="w-2 h-3 bg-red-600 rounded-[1px] -ml-0.5" />
+                                            </div>
+                                        )}
+                                        {isRed && <div className="w-2 h-3 bg-red-600 rounded-[1px]" />}
+                                        {isSubIn && <span className="text-xs text-green-400">↑</span>}
+                                        {isSubOut && <span className="text-xs text-red-400">↓</span>}
+                                        {isAssist && <span className="text-xs text-blue-400">🅰️</span>}
+                                        {isPenaltyMissed && <span className="text-xs">❌</span>}
+                                        {isPenaltySaved && <span className="text-xs">🧤</span>}
+                                    </div>
+                                );
+                            })}
                         </div>
                         {!isBench && <span className="text-[10px] text-gray-500">{p.position}</span>}
                     </div>
@@ -227,46 +253,51 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                     {/* Goal Summary (Center Aligned) */}
                     {lineups?.events && (
                         <div className="grid grid-cols-2 gap-8 px-8 pb-6 text-sm text-white/90">
-                            {/* Home Goals (Right Aligned text for center feel relative to divider) - wait user said "Left Home, Right Away" */}
-                            {/* Actually standard is: Home | Away. Let's do Home Left, Away Right. */}
+                            {/* Home Goals */}
                             <div className="text-right space-y-1 border-r border-white/10 pr-4">
                                 {Object.entries(
                                     lineups.events
-                                        .filter((e: any) => (e.isHome || e.team?.name === homeTeam?.name) && e.type === 'Goal')
+                                        .filter((e: any) => (e.isHome || e.team?.name === homeTeam?.name) && (e.type === 'Goal' || e.type === 'OwnGoal'))
                                         .reduce((acc: any, e: any) => {
-                                            const name = e.player?.name || 'Unknown';
-                                            if (!acc[name]) acc[name] = [];
-                                            acc[name].push(e);
+                                            const key = `${e.player?.name || 'Unknown'}_${e.type}`;
+                                            if (!acc[key]) acc[key] = { name: e.player?.name || 'Unknown', isOwnGoal: e.type === 'OwnGoal', times: [] };
+                                            acc[key].times.push(e);
                                             return acc;
                                         }, {})
-                                ).map(([name, events]: [string, any], i) => (
+                                ).map(([key, data]: [string, any], i) => (
                                     <div key={i} className="flex items-center justify-end gap-2">
-                                        <span className="font-semibold">{name}</span>
-                                        <span className="text-xs text-pl-teal opacity-80 font-mono">
-                                            {events.map((e: any) => `${e.time.elapsed}'${e.time.extra ? `+${e.time.extra}` : ''}`).join(', ')}
+                                        <span className="font-semibold">
+                                            {data.isOwnGoal && <span className="text-red-400">(AG) </span>}
+                                            {data.name}
                                         </span>
-                                        <span className="text-xs">⚽</span>
+                                        <span className="text-xs text-pl-teal opacity-80 font-mono">
+                                            {data.times.map((e: any) => `${e.time.elapsed}'${e.time.extra ? `+${e.time.extra}` : ''}`).join(', ')}
+                                        </span>
+                                        {data.isOwnGoal ? <span className="text-xs">⚽🔴</span> : <span className="text-xs">⚽</span>}
                                     </div>
                                 ))}
                             </div>
 
-                            {/* Away Goals (Left Aligned text) */}
+                            {/* Away Goals */}
                             <div className="text-left space-y-1 pl-4">
                                 {Object.entries(
                                     lineups.events
-                                        .filter((e: any) => (!e.isHome && e.team?.name !== homeTeam?.name || e.team?.name === awayTeam?.name) && e.type === 'Goal')
+                                        .filter((e: any) => (!e.isHome && e.team?.name !== homeTeam?.name || e.team?.name === awayTeam?.name) && (e.type === 'Goal' || e.type === 'OwnGoal'))
                                         .reduce((acc: any, e: any) => {
-                                            const name = e.player?.name || 'Unknown';
-                                            if (!acc[name]) acc[name] = [];
-                                            acc[name].push(e);
+                                            const key = `${e.player?.name || 'Unknown'}_${e.type}`;
+                                            if (!acc[key]) acc[key] = { name: e.player?.name || 'Unknown', isOwnGoal: e.type === 'OwnGoal', times: [] };
+                                            acc[key].times.push(e);
                                             return acc;
                                         }, {})
-                                ).map(([name, events]: [string, any], i) => (
+                                ).map(([key, data]: [string, any], i) => (
                                     <div key={i} className="flex items-center justify-start gap-2">
-                                        <span className="text-xs">⚽</span>
-                                        <span className="font-semibold">{name}</span>
+                                        {data.isOwnGoal ? <span className="text-xs">⚽🔴</span> : <span className="text-xs">⚽</span>}
+                                        <span className="font-semibold">
+                                            {data.isOwnGoal && <span className="text-red-400">(AG) </span>}
+                                            {data.name}
+                                        </span>
                                         <span className="text-xs text-pl-teal opacity-80 font-mono">
-                                            {events.map((e: any) => `${e.time.elapsed}'${e.time.extra ? `+${e.time.extra}` : ''}`).join(', ')}
+                                            {data.times.map((e: any) => `${e.time.elapsed}'${e.time.extra ? `+${e.time.extra}` : ''}`).join(', ')}
                                         </span>
                                     </div>
                                 ))}
@@ -274,8 +305,6 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                         </div>
                     )}
                 </div>
-
-                {/* Content Area - Scrollable */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#0f0f11] relative">
                     {error && (
                         <div className="sticky top-0 z-10 flex items-center gap-2 p-4 bg-red-500/10 text-red-400 text-sm border-b border-red-500/20 backdrop-blur-md">
@@ -296,7 +325,7 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                     </div>
                 </div>
 
-            </div>
+            </div >
         </div >
     );
 }
