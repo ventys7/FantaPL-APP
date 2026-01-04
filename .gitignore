@@ -4,3 +4,7 @@ node_modules/
 execution_result.json
 execution_result2.json
 *.env
+
+# Personal files
+*.xlsx
+*.pdf

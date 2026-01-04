@@ -15,6 +15,7 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
     const [loading, setLoading] = useState(false);
     const [lineups, setLineups] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'home' | 'away'>('home');
 
     const homeTeam = teams.get(fixture.home_team_id);
     const awayTeam = teams.get(fixture.away_team_id);
@@ -195,9 +196,9 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/80 backdrop-blur-sm p-0 md:p-4" onClick={onClose}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
             <div
-                className="bg-[#18181b] w-full max-w-4xl md:rounded-2xl h-[90vh] md:h-[80vh] flex flex-col border border-white/10 shadow-2xl overflow-hidden animate-slide-up"
+                className="bg-[#18181b] w-full max-w-4xl rounded-2xl h-[80vh] flex flex-col border border-white/10 shadow-2xl overflow-hidden animate-slide-up"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
@@ -208,7 +209,7 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                                 <span className="text-pl-pink">Match Center</span>
                             </h2>
                             <span className="text-xs text-gray-400">
-                                {new Date(fixture.date).toLocaleString()}
+                                {new Date(fixture.date).toLocaleString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                             </span>
                         </div>
                     </div>
@@ -229,82 +230,73 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
 
                 {/* Scoreboard and Footer Events */}
                 <div className="flex flex-col bg-gradient-to-r from-[#37003c] to-[#1f0029] border-b border-white/10 shrink-0">
-                    <div className="flex items-center justify-between p-6 pb-2">
-                        <div className="flex flex-col items-center w-1/3">
+                    <div className="flex items-start justify-between p-6 pb-6">
+                        {/* Home Team & Goals */}
+                        <div className="flex flex-col items-center justify-start w-1/3">
                             {homeTeam?.logo_url && <img src={homeTeam.logo_url} className="w-16 h-16 md:w-20 md:h-20 object-contain mb-2" />}
-                            <span className="font-bold text-white text-center leading-tight">{homeTeam?.name}</span>
+                            <span className="font-bold text-white text-center leading-tight mb-2 min-h-[2.5em] flex items-center justify-center">{homeTeam?.name}</span>
+
+                            {/* Home Goals (Unified) */}
+                            <div className="flex flex-col items-center gap-1 w-full">
+                                {lineups?.events
+                                    ?.filter((e: any) => (e.isHome || e.team?.name === homeTeam?.name) && (e.type === 'Goal' || e.type === 'OwnGoal'))
+                                    .map((e: any, i: number) => (
+                                        <div key={i} className="text-xs md:text-base font-medium text-white/90 whitespace-nowrap text-center">
+                                            {e.type === 'OwnGoal' && <span className="text-red-400">(AG) </span>}
+                                            {e.player?.name?.split(' ').pop()} <span className="text-pl-teal opacity-80 font-mono">{e.time.elapsed}'</span>
+                                        </div>
+                                    ))
+                                }
+                            </div>
                         </div>
 
-                        <div className="flex flex-col items-center">
-                            <div className="text-4xl md:text-5xl font-bold text-white font-mono tracking-tighter">
+                        {/* Result & Status */}
+                        <div className="flex flex-col items-center pt-4 w-1/3">
+                            <div className="text-4xl md:text-5xl font-bold text-white font-mono tracking-tighter text-center">
                                 {fixture.home_score ?? 0} - {fixture.away_score ?? 0}
                             </div>
-                            <div className="mt-2 px-3 py-1 bg-white/10 rounded text-xs font-bold text-pl-teal uppercase tracking-widest">
+                            <div className="mt-2 px-3 py-1 bg-white/10 rounded text-xs font-bold text-pl-teal uppercase tracking-widest text-center">
                                 {fixture.status === 'IN_PLAY' || fixture.status === 'PAUSED' ? `${fixture.minute}'` : fixture.status}
                             </div>
                         </div>
 
-                        <div className="flex flex-col items-center w-1/3">
+                        {/* Away Team & Goals */}
+                        <div className="flex flex-col items-center justify-start w-1/3">
                             {awayTeam?.logo_url && <img src={awayTeam.logo_url} className="w-16 h-16 md:w-20 md:h-20 object-contain mb-2" />}
-                            <span className="font-bold text-white text-center leading-tight">{awayTeam?.name}</span>
+                            <span className="font-bold text-white text-center leading-tight mb-2 min-h-[2.5em] flex items-center justify-center">{awayTeam?.name}</span>
+
+                            {/* Away Goals (Unified) */}
+                            <div className="flex flex-col items-center gap-1 w-full">
+                                {lineups?.events
+                                    ?.filter((e: any) => (!e.isHome && e.team?.name !== homeTeam?.name || e.team?.name === awayTeam?.name) && (e.type === 'Goal' || e.type === 'OwnGoal'))
+                                    .map((e: any, i: number) => (
+                                        <div key={i} className="text-xs md:text-base font-medium text-white/90 whitespace-nowrap text-center">
+                                            {e.type === 'OwnGoal' && <span className="text-red-400">(AG) </span>}
+                                            {e.player?.name?.split(' ').pop()} <span className="text-pl-teal opacity-80 font-mono">{e.time.elapsed}'</span>
+                                        </div>
+                                    ))
+                                }
+                            </div>
                         </div>
                     </div>
-
-                    {/* Goal Summary (Center Aligned) */}
-                    {lineups?.events && (
-                        <div className="grid grid-cols-2 gap-8 px-8 pb-6 text-sm text-white/90">
-                            {/* Home Goals */}
-                            <div className="text-right space-y-1 border-r border-white/10 pr-4">
-                                {Object.entries(
-                                    lineups.events
-                                        .filter((e: any) => (e.isHome || e.team?.name === homeTeam?.name) && (e.type === 'Goal' || e.type === 'OwnGoal'))
-                                        .reduce((acc: any, e: any) => {
-                                            const key = `${e.player?.name || 'Unknown'}_${e.type}`;
-                                            if (!acc[key]) acc[key] = { name: e.player?.name || 'Unknown', isOwnGoal: e.type === 'OwnGoal', times: [] };
-                                            acc[key].times.push(e);
-                                            return acc;
-                                        }, {})
-                                ).map(([key, data]: [string, any], i) => (
-                                    <div key={i} className="flex items-center justify-end gap-2">
-                                        <span className="font-semibold">
-                                            {data.isOwnGoal && <span className="text-red-400">(AG) </span>}
-                                            {data.name}
-                                        </span>
-                                        <span className="text-xs text-pl-teal opacity-80 font-mono">
-                                            {data.times.map((e: any) => `${e.time.elapsed}'${e.time.extra ? `+${e.time.extra}` : ''}`).join(', ')}
-                                        </span>
-                                        {data.isOwnGoal ? <span className="text-xs">⚽🔴</span> : <span className="text-xs">⚽</span>}
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Away Goals */}
-                            <div className="text-left space-y-1 pl-4">
-                                {Object.entries(
-                                    lineups.events
-                                        .filter((e: any) => (!e.isHome && e.team?.name !== homeTeam?.name || e.team?.name === awayTeam?.name) && (e.type === 'Goal' || e.type === 'OwnGoal'))
-                                        .reduce((acc: any, e: any) => {
-                                            const key = `${e.player?.name || 'Unknown'}_${e.type}`;
-                                            if (!acc[key]) acc[key] = { name: e.player?.name || 'Unknown', isOwnGoal: e.type === 'OwnGoal', times: [] };
-                                            acc[key].times.push(e);
-                                            return acc;
-                                        }, {})
-                                ).map(([key, data]: [string, any], i) => (
-                                    <div key={i} className="flex items-center justify-start gap-2">
-                                        {data.isOwnGoal ? <span className="text-xs">⚽🔴</span> : <span className="text-xs">⚽</span>}
-                                        <span className="font-semibold">
-                                            {data.isOwnGoal && <span className="text-red-400">(AG) </span>}
-                                            {data.name}
-                                        </span>
-                                        <span className="text-xs text-pl-teal opacity-80 font-mono">
-                                            {data.times.map((e: any) => `${e.time.elapsed}'${e.time.extra ? `+${e.time.extra}` : ''}`).join(', ')}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
                 </div>
+
+                {/* Mobile Tabs (Fixed) */}
+                <div className="md:hidden flex border-b border-white/10 shrink-0 bg-[#18181b] z-20">
+                    <button
+                        onClick={() => setActiveTab('home')}
+                        className={`flex-1 py-3 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'home' ? 'bg-[#18181b] text-white border-b-2 border-pl-teal' : 'bg-white/5 text-gray-500 hover:text-gray-300'}`}
+                    >
+                        {homeTeam?.short_name || 'Home'}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('away')}
+                        className={`flex-1 py-3 text-sm font-bold uppercase tracking-wider transition-colors ${activeTab === 'away' ? 'bg-[#18181b] text-white border-b-2 border-pl-teal' : 'bg-white/5 text-gray-500 hover:text-gray-300'}`}
+                    >
+                        {awayTeam?.short_name || 'Away'}
+                    </button>
+                </div>
+
                 <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#0f0f11] relative">
                     {error && (
                         <div className="sticky top-0 z-10 flex items-center gap-2 p-4 bg-red-500/10 text-red-400 text-sm border-b border-red-500/20 backdrop-blur-md">
@@ -313,13 +305,13 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                         </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-px bg-white/5 min-h-full pb-8">
-                        {/* Home Lineup */}
-                        <div className="bg-[#18181b] p-4">
+                    <div className="md:grid md:grid-cols-2 gap-px bg-white/5 min-h-full pb-8">
+                        {/* Home Lineup - Show if Desktop OR (Mobile AND ActiveTab is Home) */}
+                        <div className={`bg-[#18181b] p-4 ${activeTab === 'home' ? 'block' : 'hidden md:block'}`}>
                             {renderFormation(lineups?.home, true)}
                         </div>
-                        {/* Away Lineup */}
-                        <div className="bg-[#18181b] p-4 border-l border-white/5">
+                        {/* Away Lineup - Show if Desktop OR (Mobile AND ActiveTab is Away) */}
+                        <div className={`bg-[#18181b] p-4 md:border-l border-white/5 ${activeTab === 'away' ? 'block' : 'hidden md:block'}`}>
                             {renderFormation(lineups?.away, false)}
                         </div>
                     </div>
