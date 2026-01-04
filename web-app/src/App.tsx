@@ -18,7 +18,7 @@ const VoteEntry = lazy(() => import('./pages/VoteEntry').then(module => ({ defau
 const ForceChangePassword = lazy(() => import('./pages/ForceChangePassword').then(module => ({ default: module.ForceChangePassword })));
 const AdminLayout = lazy(() => import('./components/AdminLayout').then(module => ({ default: module.AdminLayout })));
 const ParticipantManagement = lazy(() => import('./pages/ParticipantManagement').then(module => ({ default: module.ParticipantManagement })));
-const AdminSystem = lazy(() => import('./pages/AdminSystem').then(module => ({ default: module.AdminSystem })));
+
 
 function AdminIndex() {
     const { hasRole } = useAuth();
@@ -96,7 +96,7 @@ function App() {
                                         </ProtectedRoute>
                                     } />
                                     <Route path="votes" element={<VoteEntry />} />
-                                    <Route path="system" element={<AdminSystem />} />
+
                                 </Route>
                             </Route>
                         </Routes>

@@ -196,18 +196,9 @@ export function Fixtures() {
 
                                         {/* Season Selector */}
                                         <div className="flex items-center gap-2 mt-1">
-                                            <button
-                                                onClick={() => setSelectedSeason(2025)}
-                                                className={`text-[10px] px-2 py-0.5 rounded transition-colors ${selectedSeason === 2025 ? 'bg-pl-teal text-pl-dark font-bold' : 'bg-white/10 text-gray-400 hover:text-white'}`}
-                                            >
+                                            <span className="text-[10px] px-2 py-0.5 rounded bg-pl-teal text-pl-dark font-bold">
                                                 25/26
-                                            </button>
-                                            <button
-                                                onClick={() => setSelectedSeason(2024)}
-                                                className={`text-[10px] px-2 py-0.5 rounded transition-colors ${selectedSeason === 2024 ? 'bg-pl-teal text-pl-dark font-bold' : 'bg-white/10 text-gray-400 hover:text-white'}`}
-                                            >
-                                                24/25
-                                            </button>
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -257,24 +248,13 @@ export function Fixtures() {
                                     <p className="text-gray-400 italic">Nessuna partita trovata {showLiveOnly ? 'in diretta' : `per la giornata ${selectedGameweek} (Stagione ${selectedSeason})`}.</p>
                                 </div>
                             ) : (
-                                filteredFixtures.map((match, idx) => {
-                                    // Group by Date Header logic
-                                    const prevMatch = filteredFixtures[idx - 1];
-                                    const currentDate = formatDate(match.date).day;
-                                    const prevDate = prevMatch ? formatDate(prevMatch.date).day : null;
-                                    const showHeader = currentDate !== prevDate;
-
+                                filteredFixtures.map((match) => {
                                     return (
                                         <div
                                             key={match.$id}
                                             onClick={() => setSelectedMatch(match)}
                                             className="cursor-pointer"
                                         >
-                                            {showHeader && !showLiveOnly && (
-                                                <div className="sticky top-0 z-10 bg-[#1f0029]/95 backdrop-blur py-1.5 px-3 text-xs font-bold text-gray-400 uppercase tracking-widest border-y border-white/5 shadow-sm">
-                                                    {currentDate}
-                                                </div>
-                                            )}
                                             <div className="bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl p-3 flex items-center justify-between transition-all group mb-2 mx-1 relative overflow-hidden">
                                                 {/* Hover Effect Gradient */}
                                                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 pointer-events-none" />
@@ -296,9 +276,14 @@ export function Fixtures() {
                                                     </div>
                                                 </div>
 
-                                                {/* Score / Status */}
-                                                <div className="mx-3 shrink-0">
+                                                {/* Score / Status / Date */}
+                                                <div className="mx-3 shrink-0 flex flex-col items-center gap-1">
                                                     {renderMatchStatus(match)}
+                                                    {/* Show Date if not live/finished (or always? User said "la data metti tipo...") */}
+                                                    {/* Let's show date always below status for clarity in non-grouped view */}
+                                                    <span className="text-[10px] text-gray-500 font-mono uppercase">
+                                                        {new Date(match.date).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit' })}
+                                                    </span>
                                                 </div>
 
                                                 {/* Away Team */}

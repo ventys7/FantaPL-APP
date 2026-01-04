@@ -34,13 +34,7 @@ export function AdminLayout() {
                         <FileText size={20} />
                         Voti
                     </NavLink>
-                    <NavLink
-                        to="/admin/system"
-                        className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition whitespace-nowrap ${isActive ? 'bg-pl-teal/20 text-pl-teal border border-pl-teal/30' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
-                    >
-                        <RefreshCw size={20} />
-                        System Sync
-                    </NavLink>
+
                 </nav>
             </div>
 
