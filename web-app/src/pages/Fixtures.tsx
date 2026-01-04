@@ -3,6 +3,8 @@ import { Calendar, Trophy, Clock, Filter, ChevronLeft, ChevronRight } from 'luci
 import { databases, COLL_FIXTURES, COLL_TEAMS, client } from '../lib/appwrite';
 import { Query } from 'appwrite';
 
+import { MatchSheet } from '../components/MatchSheet';
+
 interface PLTeam {
     $id: string;
     name: string;
@@ -24,6 +26,7 @@ interface PLFixture {
     season: number; // Added season
     home_team?: PLTeam;
     away_team?: PLTeam;
+    lineups?: string; // JSON string
 }
 
 export function Fixtures() {
@@ -33,6 +36,7 @@ export function Fixtures() {
     const [selectedGameweek, setSelectedGameweek] = useState<number>(1);
     const [selectedSeason, setSelectedSeason] = useState<number>(2025); // Default to current season
     const [showLiveOnly, setShowLiveOnly] = useState(false);
+    const [selectedMatch, setSelectedMatch] = useState<PLFixture | null>(null);
 
     // Initial Data Fetch
     useEffect(() => {
@@ -261,7 +265,11 @@ export function Fixtures() {
                                     const showHeader = currentDate !== prevDate;
 
                                     return (
-                                        <div key={match.$id}>
+                                        <div
+                                            key={match.$id}
+                                            onClick={() => setSelectedMatch(match)}
+                                            className="cursor-pointer"
+                                        >
                                             {showHeader && !showLiveOnly && (
                                                 <div className="sticky top-0 z-10 bg-[#1f0029]/95 backdrop-blur py-1.5 px-3 text-xs font-bold text-gray-400 uppercase tracking-widest border-y border-white/5 shadow-sm">
                                                     {currentDate}
@@ -338,6 +346,15 @@ export function Fixtures() {
 
                 </div>
             </div>
+
+            {/* Match Detail Modal */}
+            {selectedMatch && (
+                <MatchSheet
+                    fixture={selectedMatch}
+                    teams={teams}
+                    onClose={() => setSelectedMatch(null)}
+                />
+            )}
         </div>
     );
 }

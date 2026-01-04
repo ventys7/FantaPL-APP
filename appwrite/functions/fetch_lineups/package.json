@@ -1,0 +1,14 @@
+{
+    "name": "fetch_pl_data",
+    "version": "1.0.0",
+    "description": "Syncs Premier League data from API-Football",
+    "main": "src/main.js",
+    "type": "module",
+    "dependencies": {
+        "node-appwrite": "^14.0.0",
+        "axios": "^1.6.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}
