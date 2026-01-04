@@ -115,6 +115,46 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
 
         const renderPlayerRow = (p: any, isBench: boolean = false) => {
             const events = getPlayerEvents(p.id);
+
+            // Match Duration (default 90 if not provided)
+            const matchDuration = lineups?.meta?.totalDuration || 90;
+
+            // Calculate Effective Minutes
+            let minutesPlayed = 0;
+
+            // Find relevant events
+            // Note: Events are sorted by time usually, but we filter by player ID
+            const subIn = events?.find((e: any) => e.type === 'SubIn');
+            const subOut = events?.find((e: any) => e.type === 'SubOut');
+            const redCard = events?.find((e: any) => e.type === 'Card' && (e.detail === 'Red' || e.detail === 'YellowRed'));
+
+            if (!isBench) {
+                // STARTER logic
+                if (subOut) {
+                    minutesPlayed = subOut.time.elapsed;
+                } else if (redCard) {
+                    minutesPlayed = redCard.time.elapsed;
+                } else {
+                    minutesPlayed = matchDuration;
+                }
+            } else {
+                // BENCH logic
+                if (subIn) {
+                    const startTime = subIn.time.elapsed;
+                    let endTime = matchDuration;
+
+                    if (subOut) {
+                        endTime = subOut.time.elapsed;
+                    } else if (redCard) {
+                        endTime = redCard.time.elapsed;
+                    }
+
+                    minutesPlayed = Math.max(0, endTime - startTime);
+                }
+            }
+
+            // Append minutes to events list just for rendering? No, render separate badge.
+
             return (
                 <div key={p.id} className={`flex items-center gap-3 ${isBench ? 'p-1.5' : 'p-2 bg-white/5'} rounded hover:bg-white/10 transition group`}>
                     {/* Image & Number */}
@@ -132,43 +172,52 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                     </div>
 
                     {/* Name & Events */}
-                    <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-2">
-                            <span className={`font-semibold truncate ${isBench ? 'text-gray-400 group-hover:text-white text-xs' : 'text-sm'}`}>{p.name}</span>
-                            {/* Inline Events Icons */}
-                            {events && events.map((e: any, i: number) => {
-                                // Event types: Goal, OwnGoal, Card, SubIn, SubOut, Assist, PenaltySaved
-                                const isGoal = e.type === 'Goal';
-                                const isOwnGoal = e.type === 'OwnGoal';
-                                const isYellow = e.type === 'Card' && e.detail === 'Yellow' && !e.secondYellow;
-                                const isSecondYellow = e.type === 'Card' && (e.secondYellow || e.detail === 'YellowRed');
-                                const isRed = e.type === 'Card' && e.detail === 'Red' && !e.secondYellow;
-                                const isSubIn = e.type === 'SubIn';
-                                const isSubOut = e.type === 'SubOut';
-                                const isAssist = e.type === 'Assist';
-                                const isPenaltyMissed = e.type === 'PenaltyMissed';
-                                const isPenaltySaved = e.type === 'PenaltySaved';
+                    <div className="flex flex-col min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                                <span className={`font-semibold truncate ${isBench ? 'text-gray-400 group-hover:text-white text-xs' : 'text-sm'}`}>{p.name}</span>
+                                {/* Inline Events Icons */}
+                                {events && events.map((e: any, i: number) => {
+                                    // Event types: Goal, OwnGoal, Card, SubIn, SubOut, Assist, PenaltySaved
+                                    const isGoal = e.type === 'Goal';
+                                    const isOwnGoal = e.type === 'OwnGoal';
+                                    const isYellow = e.type === 'Card' && e.detail === 'Yellow' && !e.secondYellow;
+                                    const isSecondYellow = e.type === 'Card' && (e.secondYellow || e.detail === 'YellowRed');
+                                    const isRed = e.type === 'Card' && e.detail === 'Red' && !e.secondYellow;
+                                    const isSubIn = e.type === 'SubIn';
+                                    const isSubOut = e.type === 'SubOut';
+                                    const isAssist = e.type === 'Assist';
+                                    const isPenaltyMissed = e.type === 'PenaltyMissed';
+                                    const isPenaltySaved = e.type === 'PenaltySaved';
 
-                                return (
-                                    <div key={i} title={`${e.type} (${e.time?.elapsed}')`} className="flex-shrink-0 flex items-center">
-                                        {isGoal && <span className="text-xs">⚽</span>}
-                                        {isOwnGoal && <span className="text-xs">⚽🔴</span>}
-                                        {isYellow && <div className="w-2 h-3 bg-yellow-400 rounded-[1px]" />}
-                                        {isSecondYellow && (
-                                            <div className="flex">
-                                                <div className="w-2 h-3 bg-yellow-400 rounded-[1px]" />
-                                                <div className="w-2 h-3 bg-red-600 rounded-[1px] -ml-0.5" />
-                                            </div>
-                                        )}
-                                        {isRed && <div className="w-2 h-3 bg-red-600 rounded-[1px]" />}
-                                        {isSubIn && <span className="text-xs text-green-400">↑</span>}
-                                        {isSubOut && <span className="text-xs text-red-400">↓</span>}
-                                        {isAssist && <span className="text-xs text-blue-400">🅰️</span>}
-                                        {isPenaltyMissed && <span className="text-xs">❌</span>}
-                                        {isPenaltySaved && <span className="text-xs">🧤</span>}
-                                    </div>
-                                );
-                            })}
+                                    return (
+                                        <div key={i} title={`${e.type} (${e.time?.elapsed}')`} className="flex-shrink-0 flex items-center">
+                                            {isGoal && <span className="text-xs">⚽</span>}
+                                            {isOwnGoal && <span className="text-xs">⚽🔴</span>}
+                                            {isYellow && <div className="w-2 h-3 bg-yellow-400 rounded-[1px]" />}
+                                            {isSecondYellow && (
+                                                <div className="flex">
+                                                    <div className="w-2 h-3 bg-yellow-400 rounded-[1px]" />
+                                                    <div className="w-2 h-3 bg-red-600 rounded-[1px] -ml-0.5" />
+                                                </div>
+                                            )}
+                                            {isRed && <div className="w-2 h-3 bg-red-600 rounded-[1px]" />}
+                                            {isSubIn && <span className="text-xs text-green-400">↑</span>}
+                                            {isSubOut && <span className="text-xs text-red-400">↓</span>}
+                                            {isAssist && <span className="text-xs text-blue-400">🅰️</span>}
+                                            {isPenaltyMissed && <span className="text-xs">❌</span>}
+                                            {isPenaltySaved && <span className="text-xs">🧤</span>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Effective Minutes Badge */}
+                            {(minutesPlayed > 0) && (
+                                <div className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${isBench ? 'bg-green-900/40 border-green-500/30 text-green-400' : 'bg-white/10 border-white/20 text-gray-300'}`} title={`Played ${minutesPlayed} minutes`}>
+                                    {minutesPlayed}'
+                                </div>
+                            )}
                         </div>
                         {!isBench && <span className="text-[10px] text-gray-500">{p.position}</span>}
                     </div>
@@ -243,7 +292,9 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                                     .map((e: any, i: number) => (
                                         <div key={i} className="text-xs md:text-base font-medium text-white/90 whitespace-nowrap text-center">
                                             {e.type === 'OwnGoal' && <span className="text-red-400">(AG) </span>}
-                                            {e.player?.name?.split(' ').pop()} <span className="text-pl-teal opacity-80 font-mono">{e.time.elapsed}'</span>
+                                            {e.player?.name?.split(' ').pop()} <span className="text-pl-teal opacity-80 font-mono">
+                                                {e.time.elapsed}{e.time.extra ? `+${e.time.extra}` : ''}'
+                                            </span>
                                         </div>
                                     ))
                                 }
@@ -272,7 +323,9 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                                     .map((e: any, i: number) => (
                                         <div key={i} className="text-xs md:text-base font-medium text-white/90 whitespace-nowrap text-center">
                                             {e.type === 'OwnGoal' && <span className="text-red-400">(AG) </span>}
-                                            {e.player?.name?.split(' ').pop()} <span className="text-pl-teal opacity-80 font-mono">{e.time.elapsed}'</span>
+                                            {e.player?.name?.split(' ').pop()} <span className="text-pl-teal opacity-80 font-mono">
+                                                {e.time.elapsed}{e.time.extra ? `+${e.time.extra}` : ''}'
+                                            </span>
                                         </div>
                                     ))
                                 }

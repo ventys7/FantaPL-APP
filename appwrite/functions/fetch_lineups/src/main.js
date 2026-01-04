@@ -247,14 +247,53 @@ export default async ({ req, res, log, error }) => {
             // Ignore AddedTime, Half events
         });
 
+        // Calculate total match duration (including injury time)
+        // Method 1: Precise calculation using Half timestamps (if available)
+        let totalDuration = 90;
+        const halfs = detailsResp.data.header?.status?.halfs;
+
+        if (halfs?.secondHalfStarted && halfs?.secondHalfEnded) {
+            try {
+                // Parse "DD.MM.YYYY HH:mm:ss" - removing UTC assumption, treating as raw diff
+                const parseDate = (str) => {
+                    const [d, t] = str.split(' ');
+                    const [day, month, year] = d.split('.');
+                    const [h, m, s] = t.split(':');
+                    return new Date(`${year}-${month}-${day}T${h}:${m}:${s}`);
+                };
+
+                const start = parseDate(halfs.secondHalfStarted);
+                const end = parseDate(halfs.secondHalfEnded);
+                const diffMs = end - start;
+                const diffMins = Math.ceil(diffMs / 60000); // Round up to nearest minute
+
+                // Duration = 45 (1st half base) + 2nd Match Half Duration
+                if (diffMins > 0) {
+                    totalDuration = 45 + diffMins;
+                }
+            } catch (e) {
+                log('Error parsing half times: ' + e.message);
+            }
+        }
+        // Method 2: Fallback to Events timestamps (if Method 1 fails or returns < 90/invalid)
+        else if (eventsRaw && eventsRaw.length > 0) {
+            const maxOverload = Math.max(...eventsRaw.map(e => (e.time || 0) + (e.overloadTime || 0)));
+            if (maxOverload > 90) {
+                totalDuration = maxOverload;
+            }
+        }
+
         const lineupsData = {
             home: homeLineupData,
             away: awayLineupData,
-            events: processedEvents
+            events: processedEvents,
+            meta: {
+                totalDuration: totalDuration
+            }
         };
 
         // Return lineups directly (no database storage)
-        log(`Returning lineups for ${homeTeamName} vs ${awayTeamName}`);
+        log(`Returning lineups for ${homeTeamName} vs ${awayTeamName}. Duration: ${totalDuration}`);
         return res.json({ success: true, lineups: lineupsData });
 
     } catch (err) {

@@ -199,6 +199,72 @@ async function syncFixtures(db, log, error) {
     }
 }
 
+// --- HELPER: Check Polling Window ---
+// Returns { inWindow: boolean, reason: string, windowStart: Date, windowEnd: Date }
+async function checkPollingWindow(db, log) {
+    try {
+        // Get all fixtures for current season to find gameweek boundaries
+        const fixtures = await db.listDocuments(DATABASE_ID, FIXTURES_COLLECTION_ID, [
+            Query.equal('season', 2025),
+            Query.orderAsc('date'),
+            Query.limit(500)
+        ]);
+
+        if (!fixtures.documents.length) {
+            return { inWindow: false, reason: 'No fixtures found' };
+        }
+
+        const now = new Date();
+
+        // Find the "active" gameweek based on current date
+        // Active = first gameweek where not all matches are finished
+        const gameweeks = [...new Set(fixtures.documents.map(f => f.gameweek))].sort((a, b) => a - b);
+
+        let activeGameweek = null;
+        for (const gw of gameweeks) {
+            const gwFixtures = fixtures.documents.filter(f => f.gameweek === gw);
+            const allFinished = gwFixtures.every(f => f.status === 'FINISHED');
+            if (!allFinished) {
+                activeGameweek = gw;
+                break;
+            }
+        }
+
+        // If all gameweeks are finished, no polling needed
+        if (!activeGameweek) {
+            return { inWindow: false, reason: 'All gameweeks finished' };
+        }
+
+        // Get fixtures for active gameweek
+        const gwFixtures = fixtures.documents.filter(f => f.gameweek === activeGameweek);
+        const dates = gwFixtures.map(f => new Date(f.date));
+        const firstMatch = new Date(Math.min(...dates));
+        const lastMatch = new Date(Math.max(...dates));
+
+        // Window: Midnight day BEFORE first match -> Midnight day AFTER last match
+        const windowStart = new Date(firstMatch);
+        windowStart.setDate(windowStart.getDate() - 1);
+        windowStart.setHours(0, 0, 0, 0);
+
+        const windowEnd = new Date(lastMatch);
+        windowEnd.setDate(windowEnd.getDate() + 2); // +2 because we want midnight AFTER the day
+        windowEnd.setHours(0, 0, 0, 0);
+
+        const inWindow = now >= windowStart && now <= windowEnd;
+
+        return {
+            inWindow,
+            reason: inWindow ? 'Within active window' : `Outside window (GW${activeGameweek}: ${windowStart.toISOString()} - ${windowEnd.toISOString()})`,
+            activeGameweek,
+            windowStart,
+            windowEnd
+        };
+    } catch (err) {
+        log(`Polling window check failed: ${err.message}, defaulting to IN window`);
+        return { inWindow: true, reason: 'Check failed, defaulting to active' };
+    }
+}
+
 // --- LOGIC: Live / Today Updates (Lightweight) ---
 async function syncLiveOrToday(db, log, error, mode = 'LIVE') {
     try {
@@ -266,7 +332,7 @@ async function syncLiveOrToday(db, log, error, mode = 'LIVE') {
 
 // --- MAIN HANDLER ---
 export default async ({ req, res, log, error }) => {
-    log('=== fetch_pl_data v9 (30s Loop) ===');
+    log('=== fetch_pl_data v10 (Smart Polling Window) ===');
 
     // Parse Body
     let body = {};
@@ -309,6 +375,21 @@ export default async ({ req, res, log, error }) => {
         // LIVE UPDATES with 30s Loop
         if (action === 'LIVE_UPDATES' || action === 'TODAY_MATCHES') {
             const mode = action === 'TODAY_MATCHES' ? 'TODAY' : 'LIVE';
+
+            // Check if we're inside the polling window (only for scheduled runs)
+            if (isSchedule) {
+                const windowCheck = await checkPollingWindow(db, log);
+                log(`📅 Polling Window: ${windowCheck.reason}`);
+
+                if (!windowCheck.inWindow) {
+                    return res.json({
+                        success: true,
+                        skipped: true,
+                        reason: windowCheck.reason,
+                        message: 'Outside polling window, no updates needed'
+                    });
+                }
+            }
 
             // Run 1
             log(`[Run 1] ${mode} update...`);
