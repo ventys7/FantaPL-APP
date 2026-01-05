@@ -197,7 +197,7 @@ export const Players = () => {
                                             alert('Sync completato con successo!');
                                         } else {
                                             console.error('Sync failed:', result);
-                                            alert(`Sync fallito: ${result.response || 'Errore sconosciuto'}`);
+                                            alert(`Sync fallito: ${(result as any).responseBody || (result as any).response || 'Errore sconosciuto'}`);
                                         }
                                     } catch (err) {
                                         console.error('Sync failed:', err);
