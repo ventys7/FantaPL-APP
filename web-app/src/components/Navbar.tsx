@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trophy, Calendar, Users, Shield, FileText, LogIn, LogOut, ChevronDown, Menu, X, ClipboardList } from 'lucide-react';
+import { Trophy, Calendar, Users, Shield, FileText, LogIn, LogOut, ChevronDown, Menu, X, ClipboardList, Shirt } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const Navbar = () => {
@@ -34,7 +34,7 @@ export const Navbar = () => {
                     {/* Desktop Navigation - hidden on mobile */}
                     {user && (
                         <Link to="/dashboard" className="hidden md:flex flex-col items-center text-gray-300 hover:text-white transition cursor-pointer">
-                            <Users size={20} />
+                            <Shirt size={20} />
                             <span className="text-xs mt-1">La Mia Squadra</span>
                         </Link>
                     )}
@@ -104,7 +104,7 @@ export const Navbar = () => {
                                 className="flex items-center gap-3 px-6 py-4 text-gray-300 hover:text-white hover:bg-white/10 transition border-b border-white/10"
                                 onClick={closeMobileMenu}
                             >
-                                <Users size={20} />
+                                <Shirt size={20} />
                                 <span>La Mia Squadra</span>
                             </Link>
                         )}

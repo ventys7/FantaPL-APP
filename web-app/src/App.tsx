@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { logger } from './lib/logger';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -19,6 +19,8 @@ const VoteEntry = lazy(() => import('./pages/VoteEntry').then(module => ({ defau
 const ForceChangePassword = lazy(() => import('./pages/ForceChangePassword').then(module => ({ default: module.ForceChangePassword })));
 const AdminLayout = lazy(() => import('./components/AdminLayout').then(module => ({ default: module.AdminLayout })));
 const ParticipantManagement = lazy(() => import('./pages/ParticipantManagement').then(module => ({ default: module.ParticipantManagement })));
+const AdminSystem = lazy(() => import('./pages/AdminSystem').then(module => ({ default: module.AdminSystem })));
+const AdminPlayers = lazy(() => import('./pages/AdminPlayers').then(module => ({ default: module.AdminPlayers })));
 
 
 function AdminIndex() {
@@ -60,6 +62,13 @@ const LoadingSpinner = () => (
     </div>
 );
 
+// Access Control Component for Specific Users
+const AllowedUserCheck = ({ children, allowedId }: { children: ReactNode, allowedId: string }) => {
+    const { user } = useAuth();
+    if (user?.$id !== allowedId) return <Navigate to="/admin" replace />;
+    return <>{children}</>;
+};
+
 function App() {
     return (
         <AuthProvider>
@@ -97,7 +106,19 @@ function App() {
                                             <ParticipantManagement />
                                         </ProtectedRoute>
                                     } />
+                                    <Route path="players" element={
+                                        <ProtectedRoute requiredRole="admin">
+                                            <AdminPlayers />
+                                        </ProtectedRoute>
+                                    } />
                                     <Route path="votes" element={<VoteEntry />} />
+                                    <Route path="system" element={
+                                        <ProtectedRoute requiredRole="admin">
+                                            <AllowedUserCheck allowedId="695842e1003a3db19fea">
+                                                <AdminSystem />
+                                            </AllowedUserCheck>
+                                        </ProtectedRoute>
+                                    } />
 
                                 </Route>
                             </Route>

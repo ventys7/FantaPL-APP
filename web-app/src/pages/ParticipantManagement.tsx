@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { account, databases, functions, COLL_FANTASY_TEAMS, DB_ID } from '../lib/appwrite';
 import { ID, Query, ExecutionMethod } from 'appwrite';
 import { User, UserRole } from '../types/shared';
-import { Trash2, Edit2, Shield, UserPlus, RefreshCw, Lock, Unlock, ChevronUp, ChevronDown } from 'lucide-react';
+import { Trash2, Edit2, Shield, UserPlus, Users, RefreshCw, Lock, Unlock, ChevronUp, ChevronDown, Search, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-type SortKey = 'name' | 'role' | 'status';
+type SortKey = 'name' | 'role';
 type SortDirection = 'asc' | 'desc';
 
 export function ParticipantManagement() {
@@ -13,6 +13,7 @@ export function ParticipantManagement() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Sort State
     const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
@@ -25,6 +26,8 @@ export function ParticipantManagement() {
     const [newUsername, setNewUsername] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [newRole, setNewRole] = useState<UserRole>('user');
+
+    const GHOST_ADMIN_ID = '695842e1003a3db19fea';
 
     useEffect(() => {
         loadUsers();
@@ -48,7 +51,12 @@ export function ParticipantManagement() {
                 }
             })) as unknown as User[];
 
-            setUsers(mappedUsers);
+            // Filter Ghost Admin: Visible ONLY to himself
+            const filteredUsers = mappedUsers.filter(u =>
+                u.$id !== GHOST_ADMIN_ID || currentUser?.$id === GHOST_ADMIN_ID
+            );
+
+            setUsers(filteredUsers);
         } catch (error) {
             console.error('Error loading participants:', error);
         } finally {
@@ -65,20 +73,31 @@ export function ParticipantManagement() {
     };
 
     const getSortedUsers = () => {
-        const sorted = [...users];
+        let sorted = [...users];
+
+        // Filter by Search Term
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            sorted = sorted.filter(u => u.name.toLowerCase().includes(term));
+        }
+
         sorted.sort((a, b) => {
+            // 1. PRIMARY SORT: Status (Active First, Inactive/Disabled LAST)
+            // If statuses are different, prioritize Active (status=true)
+            if (a.status !== b.status) {
+                return a.status ? -1 : 1;
+            }
+
+            // 2. SECONDARY SORT: Selected Key (Name/Role)
             let aValue: any;
             let bValue: any;
 
             if (sortConfig.key === 'role') {
                 aValue = a.prefs.role || '';
                 bValue = b.prefs.role || '';
-            } else if (sortConfig.key === 'status') {
-                aValue = a.status ? 1 : 0;
-                bValue = b.status ? 1 : 0;
             } else {
-                aValue = (a as any)[sortConfig.key];
-                bValue = (b as any)[sortConfig.key];
+                aValue = a.name.toLowerCase();
+                bValue = b.name.toLowerCase();
             }
 
             if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -144,9 +163,6 @@ export function ParticipantManagement() {
 
         setLoading(true);
         try {
-            // 1. Call Appwrite Cloud Function to update Auth Password (Server-side)
-            // Replace 'admin-password-reset' with your actual Function ID from Appwrite Console
-            // For now we use the name, but you should update this constant
             const FUNCTION_ID = 'admin-password-reset';
 
             const execution = await functions.createExecution(
@@ -167,7 +183,6 @@ export function ParticipantManagement() {
                 throw new Error(result.error);
             }
 
-            // 2. Set 'force_pass_reset' flag in Database so they must change it again
             await databases.updateDocument(DB_ID, COLL_FANTASY_TEAMS, docId, {
                 force_pass_reset: true
             });
@@ -192,11 +207,7 @@ export function ParticipantManagement() {
     };
 
     const handleToggleStatus = async (docId: string, currentStatus: boolean, name: string) => {
-        // currentStatus = true means Active (!hidden). Hidden = false.
-        // We want to flip it. 
-        // If Active -> Disable (hidden: true)
-        // If Non Active -> Enable (hidden: false)
-        const newHidden = currentStatus; // If currently active (status=true, hidden=false), new hidden should be true. Correct.
+        const newHidden = currentStatus; // Active -> Hidden=true
 
         try {
             await databases.updateDocument(DB_ID, COLL_FANTASY_TEAMS, docId, { hidden: newHidden });
@@ -222,88 +233,111 @@ export function ParticipantManagement() {
     };
 
     const SortIcon = ({ colKey }: { colKey: SortKey }) => {
-        if (sortConfig.key !== colKey) return <div className="w-4 h-4 opacity-0" />; // Placeholder
-        return sortConfig.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
+        if (sortConfig.key !== colKey) return <div className="w-3 h-3 opacity-0" />;
+        return sortConfig.direction === 'asc' ? <ChevronUp size={14} className="text-pl-teal" /> : <ChevronDown size={14} className="text-pl-teal" />;
     };
 
     const sortedUsers = getSortedUsers();
 
     return (
-        <div className="p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-white">Gestione Partecipanti</h1>
-                <button
-                    onClick={() => setIsCreating(true)}
-                    className="flex items-center gap-2 bg-pl-teal text-white px-4 py-2 rounded-lg hover:bg-pl-teal/80 transition"
-                >
-                    <UserPlus size={20} />
-                    Nuovo Partecipante
-                </button>
+        <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-8">
+
+            {/* Header */}
+            <div className="flex flex-col items-center justify-center gap-6">
+                <div className="text-center">
+                    <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center justify-center md:justify-start gap-3">
+                        <Users className="text-pl-teal w-8 h-8" />
+                        Partecipanti
+                    </h1>
+                    <p className="text-gray-400 text-sm mt-1">Gestisci gli utenti e i loro permessi.</p>
+                </div>
+
+                <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+                    <div className="relative w-full md:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <input
+                            type="text"
+                            placeholder="Cerca manager..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="bg-black/20 border border-white/10 rounded-lg pl-9 pr-4 py-3 md:py-2 text-sm text-white focus:outline-none focus:border-pl-teal/50 w-full transition"
+                        />
+                    </div>
+                    <button
+                        onClick={() => setIsCreating(prev => !prev)}
+                        className={`w-full md:w-auto font-bold px-6 py-3 md:py-2 rounded-lg transition shadow-lg flex items-center justify-center gap-2 whitespace-nowrap text-sm ${isCreating ? 'bg-gray-600 text-white hover:bg-gray-500' : 'bg-pl-teal text-pl-dark hover:bg-pl-teal/90 shadow-pl-teal/20'}`}
+                    >
+                        {isCreating ? <X size={18} /> : <UserPlus size={18} />}
+                        {isCreating ? 'Chiudi' : 'Nuovo Utente'}
+                    </button>
+                </div>
             </div>
 
-            {/* Note on Limitations - Visible only to specific 'admin' user (case insensitive) */}
+            {/* Admin Note Box */}
             {currentUser?.name?.toLowerCase() === 'admin' && (
-                <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-lg mb-6 text-sm text-yellow-200">
-                    <h4 className="font-bold flex items-center gap-2 mb-1"><Shield size={16} /> Note Importanti per l'Admin</h4>
-                    <ul className="list-disc list-inside space-y-1 opacity-90">
-                        <li>
-                            <strong>Reset Password:</strong> Imposta solo l'obbligo di cambio. Se l'utente ha <em>dimenticato</em> la password, devi <strong>Eliminare e Ricreare</strong> l'utente (limitazione di sicurezza).
-                        </li>
-                        <li>
-                            <strong>Eliminazione:</strong> Rimuove solo il Profilo (Dati Fanta). Devi rimuovere manualmente l'account di Login (Auth) dalla Console Appwrite per riusare lo username.
-                        </li>
+                <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-xl text-xs md:text-sm text-yellow-200/80">
+                    <h4 className="font-bold flex items-center gap-2 mb-2 text-yellow-200"><Shield size={14} /> Note Admin</h4>
+                    <ul className="list-disc list-inside space-y-1 opacity-80">
+                        <li><strong>Reset Password:</strong> Forza il reset al prossimo login. Non cambia la password Auth se l'utente l'ha scordata (Eliminare e Ricreare).</li>
+                        <li><strong>Eliminazione:</strong> Rimuove solo i dati FantaPL. Rimuovere l'utente Auth manualmente dalla Console.</li>
                     </ul>
                 </div>
             )}
 
+            {/* Create User Form */}
             {isCreating && (
-                <div className="bg-white/5 border border-white/20 rounded-xl p-6 mb-8 animate-fade-in">
-                    <h3 className="text-xl font-bold text-white mb-4">Nuovo Utente</h3>
-                    <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input
-                            type="text"
-                            placeholder="Nome Manager (es. Paolo)"
-                            value={newName}
-                            onChange={e => setNewName(e.target.value)}
-                            className="bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
-                            required
-                        />
-                        <input
-                            type="text"
-                            placeholder="Username Login (es. paolo)"
-                            value={newUsername}
-                            onChange={e => setNewUsername(e.target.value)}
-                            className="bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
-                            required
-                        />
-                        <input
-                            type="password"
-                            placeholder="Password Provvisoria"
-                            value={newPassword}
-                            onChange={e => setNewPassword(e.target.value)}
-                            className="bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
-                            required
-                        />
-                        <select
-                            value={newRole}
-                            onChange={e => setNewRole(e.target.value as UserRole)}
-                            className="bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
-                        >
-                            <option value="user">Utente</option>
-                            <option value="helper">Helper</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                        <div className="md:col-span-2 flex justify-end gap-2 mt-2">
-                            <button
-                                type="button"
-                                onClick={() => setIsCreating(false)}
-                                className="px-4 py-2 text-gray-300 hover:text-white"
+                <div className="bg-[#1e1e24] border border-white/10 rounded-2xl p-6 shadow-2xl animate-in fade-in slide-in-from-top-4">
+                    <h3 className="text-lg font-bold text-white mb-6 border-b border-white/5 pb-4">Nuovo Profilo</h3>
+                    <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs text-gray-500 font-bold uppercase">Nome Manager</label>
+                            <input
+                                type="text"
+                                placeholder="Es. Paolo"
+                                value={newName}
+                                onChange={e => setNewName(e.target.value)}
+                                className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-pl-teal/50 focus:bg-black/40 transition outline-none"
+                                required
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs text-gray-500 font-bold uppercase">Username</label>
+                            <input
+                                type="text"
+                                placeholder="Es. paolo"
+                                value={newUsername}
+                                onChange={e => setNewUsername(e.target.value)}
+                                className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-pl-teal/50 focus:bg-black/40 transition outline-none"
+                                required
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs text-gray-500 font-bold uppercase">Password Temp</label>
+                            <input
+                                type="password"
+                                placeholder="Es. pippo123"
+                                value={newPassword}
+                                onChange={e => setNewPassword(e.target.value)}
+                                className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-pl-teal/50 focus:bg-black/40 transition outline-none"
+                                required
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs text-gray-500 font-bold uppercase">Ruolo</label>
+                            <select
+                                value={newRole}
+                                onChange={e => setNewRole(e.target.value as UserRole)}
+                                className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:border-pl-teal/50 focus:bg-black/40 transition outline-none appearance-none"
                             >
-                                Annulla
-                            </button>
+                                <option value="user">Utente</option>
+                                <option value="helper">Helper</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <div className="md:col-span-2 lg:col-span-4 flex justify-end gap-3 mt-4 pt-4 border-t border-white/5">
                             <button
                                 type="submit"
-                                className="bg-green-500/20 text-green-400 border border-green-500/50 px-6 py-2 rounded-lg hover:bg-green-500/30"
+                                className="bg-pl-teal hover:bg-pl-teal/90 text-pl-dark px-6 py-2.5 rounded-lg font-bold shadow-lg shadow-pl-teal/20 transition w-full md:w-auto"
                             >
                                 Crea Utente
                             </button>
@@ -312,88 +346,125 @@ export function ParticipantManagement() {
                 </div>
             )}
 
-            <div className="bg-white/5 border border-white/20 rounded-xl overflow-hidden">
+            {/* Desktop Table */}
+            <div className="hidden md:block bg-[#16161a] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
                 <table className="w-full text-left">
-                    <thead className="bg-black/20 text-gray-400 uppercase text-sm">
+                    <thead className="bg-black/20 text-gray-500 uppercase text-xs font-bold tracking-wider">
                         <tr>
-                            <th className="p-4 cursor-pointer hover:text-white transition flex items-center gap-1" onClick={() => handleSort('name')}>
-                                Manager <SortIcon colKey="name" />
+                            <th className="p-5 cursor-pointer hover:text-white transition group select-none w-auto" onClick={() => handleSort('name')}>
+                                <div className="flex items-center gap-2">Manager <SortIcon colKey="name" /></div>
                             </th>
-                            <th className="p-4 cursor-pointer hover:text-white transition" onClick={() => handleSort('role')}>
-                                <div className="flex items-center gap-1">Ruolo <SortIcon colKey="role" /></div>
+                            <th className="p-5 cursor-pointer hover:text-white transition group select-none w-40" onClick={() => handleSort('role')}>
+                                <div className="flex items-center gap-2">Ruolo <SortIcon colKey="role" /></div>
                             </th>
-                            <th className="p-4 cursor-pointer hover:text-white transition" onClick={() => handleSort('status')}>
-                                <div className="flex items-center gap-1">Stato <SortIcon colKey="status" /></div>
-                            </th>
-                            <th className="p-4 text-right">Azioni</th>
+                            {/* REMOVED STATUS COLUMN HEADER */}
+                            <th className="p-5 text-right w-48">Azioni</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/10">
-                        {sortedUsers
-                            .filter(u => u.name.toLowerCase() !== 'admin' || currentUser?.name?.toLowerCase() === 'admin')
-                            .map(u => (
-                                <tr key={u.$id} className="hover:bg-white/5 transition">
-                                    <td className="p-4 font-medium text-white">
-                                        <div className="flex flex-col">
-                                            <span>{u.name}</span>
-                                            <details className="text-xs text-gray-500 cursor-pointer select-none">
-                                                <summary className="hover:text-gray-300 transition-colors">Mostra ID</summary>
-                                                <span className="select-all font-mono bg-black/30 px-1 rounded">{u.$id}</span>
-                                            </details>
-                                        </div>
-                                        {u.prefs?.teamId === currentUser?.prefs?.teamId && <span className="ml-2 text-xs text-pl-teal">(Tu)</span>}
-                                    </td>
-                                    <td className="p-4">
-                                        <select
-                                            value={u.prefs.role}
-                                            onChange={(e) => handleUpdateRole(u.prefs.teamId!, e.target.value as UserRole, u.name)}
-                                            className="bg-black/20 border border-white/10 rounded px-2 py-1 text-sm text-gray-300 focus:text-white"
-                                        >
-                                            <option value="user">Utente</option>
-                                            <option value="helper">Helper</option>
-                                            <option value="admin">Admin</option>
-                                        </select>
-                                    </td>
-                                    <td className="p-4">
-                                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium border ${u.status ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
-                                            {u.status ? 'Attivo' : 'Non Attivo'}
-                                        </span>
-                                    </td>
-                                    <td className="p-4 flex justify-end gap-2">
-                                        <button
-                                            onClick={() => handleToggleStatus(u.prefs.teamId!, u.status, u.name)}
-                                            className={`p-2 hover:bg-white/10 rounded-lg ${u.status ? 'text-orange-400' : 'text-green-400'}`}
-                                            title={u.status ? "Disabilita Account" : "Riabilita Account"}
-                                        >
-                                            {u.status ? <Lock size={16} /> : <Unlock size={16} />}
-                                        </button>
+                    <tbody className="divide-y divide-white/5">
+                        {sortedUsers.map(u => (
+                            <tr key={u.$id} className={`hover:bg-white/[0.02] transition group ${!u.status ? 'opacity-50' : ''}`}>
+                                <td className="p-5">
+                                    <div className="flex items-center gap-3">
+                                        {/* Status Dot */}
+                                        <div
+                                            className={`w-2.5 h-2.5 rounded-full shrink-0 ${u.status ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`}
+                                            title={u.status ? 'Attivo' : 'Sospeso'}
+                                        />
 
-                                        <button
-                                            onClick={() => handleRename(u.prefs.teamId!, u.name)}
-                                            className="p-2 hover:bg-white/10 rounded-lg text-yellow-400"
-                                            title="Rinomina Manager"
-                                        >
-                                            <Edit2 size={16} />
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-white text-base">{u.name}</span>
+                                            <span className="text-xs text-gray-600 font-mono hidden group-hover:block transition-opacity select-all">{u.$id}</span>
+                                        </div>
+                                        {u.prefs?.teamId === currentUser?.prefs?.teamId && <span className="px-2 py-0.5 bg-pl-teal/10 text-pl-teal text-[10px] font-bold uppercase rounded ml-2">Tu</span>}
+                                    </div>
+                                </td>
+                                <td className="p-5">
+                                    <select
+                                        value={u.prefs.role}
+                                        onChange={(e) => handleUpdateRole(u.prefs.teamId!, e.target.value as UserRole, u.name)}
+                                        className="bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:text-white outline-none focus:border-white/20 hover:bg-white/5 transition cursor-pointer"
+                                    >
+                                        <option value="user">Utente</option>
+                                        <option value="helper">Helper</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </td>
+                                {/* REMOVED STATUS COLUMN CELL */}
+                                <td className="p-5">
+                                    <div className="flex justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                        <button onClick={() => handleToggleStatus(u.prefs.teamId!, u.status, u.name)} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition" title={u.status ? "Disabilita" : "Abilita"}>
+                                            {u.status ? <Lock size={18} /> : <Unlock size={18} />}
                                         </button>
-                                        <button
-                                            onClick={() => handleResetPassword(u.prefs.teamId!, u.name, u.$id)}
-                                            className="p-2 hover:bg-white/10 rounded-lg text-blue-400"
-                                            title="Imposta Nuova Password Provvisoria"
-                                        >
-                                            <RefreshCw size={16} />
+                                        <button onClick={() => handleRename(u.prefs.teamId!, u.name)} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-yellow-400 transition" title="Rinomina">
+                                            <Edit2 size={18} />
                                         </button>
-                                        <button
-                                            onClick={() => handleDelete(u.prefs.teamId!, u.name)}
-                                            className="p-2 hover:bg-white/10 rounded-lg text-red-400"
-                                            title="Elimina Profilo (Richiede anche delete Auth)"
-                                        >
-                                            <Trash2 size={16} />
+                                        <button onClick={() => handleResetPassword(u.prefs.teamId!, u.name, u.$id)} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-blue-400 transition" title="Reset Password">
+                                            <RefreshCw size={18} />
                                         </button>
-                                    </td>
-                                </tr>
-                            ))}
+                                        <button onClick={() => handleDelete(u.prefs.teamId!, u.name)} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-red-400 transition" title="Elimina">
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden space-y-4">
+                {sortedUsers.map(u => (
+                    <div key={u.$id} className={`bg-[#16161a] border border-white/5 rounded-xl p-5 shadow-lg relative overflow-hidden ${!u.status ? 'opacity-60' : ''}`}>
+                        {/* Status Bar */}
+                        <div className={`absolute top-0 left-0 w-1 h-full ${u.status ? 'bg-emerald-500' : 'bg-red-500'}`} />
+
+                        <div className="flex justify-between items-start mb-4 pl-2">
+                            <div className="flex gap-3 items-center">
+                                {/* Status Dot Mobile */}
+                                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${u.status ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                <div>
+                                    <div className="font-bold text-lg text-white leading-tight">{u.name}</div>
+                                    <div className="text-[10px] text-gray-600 font-mono mt-0.5">{u.$id}</div>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => handleToggleStatus(u.prefs.teamId!, u.status, u.name)} className="p-2 bg-white/5 rounded-full text-gray-400 hover:text-white">
+                                    {u.status ? <Lock size={16} /> : <Unlock size={16} />}
+                                </button>
+                                <button onClick={() => handleRename(u.prefs.teamId!, u.name)} className="p-2 bg-white/5 rounded-full text-gray-400 hover:text-yellow-400">
+                                    <Edit2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 mb-4 pl-2 border-t border-white/5 pt-4">
+                            <div>
+                                <label className="text-[10px] uppercase text-gray-500 font-bold block mb-1">Ruolo</label>
+                                <select
+                                    value={u.prefs.role}
+                                    onChange={(e) => handleUpdateRole(u.prefs.teamId!, e.target.value as UserRole, u.name)}
+                                    className="bg-black/30 border border-white/10 rounded px-2 py-1.5 text-xs text-gray-300 w-full"
+                                >
+                                    <option value="user">Utente</option>
+                                    <option value="helper">Helper</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                            {/* REMOVED STATUS TEXT BOX ON MOBILE too, inferred by Color/Dot */}
+                        </div>
+
+                        <div className="flex gap-2 justify-end pl-2 pt-2 border-t border-white/5">
+                            <button onClick={() => handleResetPassword(u.prefs.teamId!, u.name, u.$id)} className="flex-1 py-2 text-xs font-medium bg-blue-500/10 text-blue-400 rounded-lg border border-blue-500/20 flex items-center justify-center gap-2">
+                                <RefreshCw size={14} /> Password
+                            </button>
+                            <button onClick={() => handleDelete(u.prefs.teamId!, u.name)} className="flex-1 py-2 text-xs font-medium bg-red-500/10 text-red-400 rounded-lg border border-red-500/20 flex items-center justify-center gap-2">
+                                <Trash2 size={14} /> Elimina
+                            </button>
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );

@@ -1,9 +1,7 @@
 import { useState, useMemo } from 'react';
-import { Search, Users, ChevronDown, ChevronUp, User, RefreshCw, Loader2 } from 'lucide-react';
-import { usePlayers, Player } from '../hooks/usePlayers';
+import { Search, Users, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { usePlayers } from '../hooks/usePlayers';
 import { useAuth } from '../context/AuthContext';
-import { functions } from '../lib/appwrite';
-import { ExecutionMethod } from 'appwrite';
 
 type SortKey = 'position' | 'quotation' | 'purchase_price' | null;
 type SortDirection = 'asc' | 'desc';
@@ -11,8 +9,8 @@ type SortDirection = 'asc' | 'desc';
 const ROLES = ['Tutti', 'Portiere', 'Difensore', 'Centrocampista', 'Attaccante'];
 const ROLE_COLORS: Record<string, string> = {
     'Portiere': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    'Difensore': 'bg-green-500/20 text-green-400 border-green-500/30',
-    'Centrocampista': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    'Difensore': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    'Centrocampista': 'bg-green-500/20 text-green-400 border-green-500/30',
     'Attaccante': 'bg-red-500/20 text-red-400 border-red-500/30',
     'Unknown': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
 };
@@ -45,7 +43,6 @@ export const Players = () => {
     const [showTeamDropdown, setShowTeamDropdown] = useState(false);
     const [showOwnerDropdown, setShowOwnerDropdown] = useState(false);
     const [showRoleDropdown, setShowRoleDropdown] = useState(false);
-    const [syncing, setSyncing] = useState(false);
 
     // Sorting state - default to role ascending
     const [sortKey, setSortKey] = useState<SortKey>('position');
@@ -91,7 +88,7 @@ export const Players = () => {
 
         return [...filteredPlayers].sort((a, b) => {
             if (sortKey === 'position') {
-                // Sort by role, then team, then name
+                // Sort by role, then team, then quotation (desc), then name
                 const roleA = ROLE_ORDER[a.position] || 5;
                 const roleB = ROLE_ORDER[b.position] || 5;
                 const roleDiff = sortDirection === 'asc' ? roleA - roleB : roleB - roleA;
@@ -101,7 +98,11 @@ export const Players = () => {
                 const teamDiff = a.team_short_name.localeCompare(b.team_short_name);
                 if (teamDiff !== 0) return teamDiff;
 
-                // Same team: sort by name
+                // Same team: sort by quotation descending
+                const quotationDiff = (b.quotation || 0) - (a.quotation || 0);
+                if (quotationDiff !== 0) return quotationDiff;
+
+                // Same quotation: sort by name
                 return a.name.localeCompare(b.name);
             } else {
                 // Numeric sort for quotation/purchase_price
@@ -164,55 +165,6 @@ export const Players = () => {
                             />
                         </div>
 
-                        {/* Sync & Refresh Button - Admin Only */}
-                        {user?.prefs?.role === 'admin' && (
-                            <button
-                                onClick={async () => {
-                                    setSyncing(true);
-                                    try {
-                                        // Start async execution
-                                        const execution = await functions.createExecution(
-                                            '695afdb40034ed9a82d7',
-                                            JSON.stringify({ action: 'SYNC_PLAYERS' }),
-                                            true, // Async = true to avoid timeout
-                                            '/',
-                                            ExecutionMethod.POST
-                                        );
-
-                                        // Poll for completion
-                                        let status = execution.status;
-                                        let result = execution;
-
-                                        while (status === 'processing' || status === 'waiting') {
-                                            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
-                                            result = await functions.getExecution(
-                                                '695afdb40034ed9a82d7',
-                                                execution.$id
-                                            );
-                                            status = result.status;
-                                        }
-
-                                        if (status === 'completed') {
-                                            await refresh();
-                                            alert('Sync completato con successo!');
-                                        } else {
-                                            console.error('Sync failed:', result);
-                                            alert(`Sync fallito: ${(result as any).responseBody || (result as any).response || 'Errore sconosciuto'}`);
-                                        }
-                                    } catch (err) {
-                                        console.error('Sync failed:', err);
-                                        alert('Errore durante il sync. Controlla la console.');
-                                    } finally {
-                                        setSyncing(false);
-                                    }
-                                }}
-                                disabled={syncing}
-                                className={`p-3 rounded-xl transition ${syncing ? 'bg-pl-teal/30 text-pl-teal' : 'bg-white/10 text-gray-300 hover:text-white hover:bg-white/20'}`}
-                                title="Sincronizza giocatori da FotMob"
-                            >
-                                <RefreshCw size={20} className={syncing ? 'animate-spin' : ''} />
-                            </button>
-                        )}
                     </div>
                 </div>
 
@@ -547,6 +499,6 @@ export const Players = () => {
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };

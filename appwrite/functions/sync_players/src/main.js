@@ -202,6 +202,30 @@ async function syncPlayers(db, log) {
     return { success: true, action: 'SYNC_PLAYERS', teamsProcessed: teams.length, totalPlayers, syncedPlayers, errors };
 }
 
+// ============ UPDATE PLAYER ============
+async function updatePlayer(db, log, data) {
+    const { playerId, updates } = data;
+    log(`Updating player ${playerId}...`);
+
+    if (!playerId || !updates) throw new Error('Missing playerId or updates');
+
+    // Filter allowed fields for security
+    const allowed = ['position', 'quotation', 'purchase_price', 'owner'];
+    const safeUpdates = {};
+
+    Object.keys(updates).forEach(key => {
+        if (allowed.includes(key)) {
+            safeUpdates[key] = updates[key];
+        }
+    });
+
+    if (Object.keys(safeUpdates).length === 0) throw new Error('No valid fields to update');
+
+    await db.updateDocument(DATABASE_ID, PLAYERS_COLLECTION_ID, playerId, safeUpdates);
+
+    return { success: true, action: 'UPDATE_PLAYER', playerId, updates: safeUpdates };
+}
+
 // ============ MAIN HANDLER ============
 export default async ({ req, res, log, error }) => {
     log('=== sync_players v2 (Teams + Players) ===');
@@ -245,6 +269,11 @@ export default async ({ req, res, log, error }) => {
                 teams: teamsResult,
                 players: playersResult
             });
+        }
+
+        if (action === 'UPDATE_PLAYER') {
+            const result = await updatePlayer(db, log, body);
+            return res.json(result);
         }
 
         return res.json({ success: false, error: `Unknown action: ${action}` }, 400);
