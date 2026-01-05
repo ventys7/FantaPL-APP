@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trophy, Calendar, Users, Shield, FileText, LogIn, LogOut, ChevronDown, Menu, X } from 'lucide-react';
+import { Trophy, Calendar, Users, Shield, FileText, LogIn, LogOut, ChevronDown, Menu, X, ClipboardList } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const Navbar = () => {
@@ -38,6 +38,11 @@ export const Navbar = () => {
                             <span className="text-xs mt-1">La Mia Squadra</span>
                         </Link>
                     )}
+
+                    <Link to="/players" className="hidden md:flex flex-col items-center text-gray-300 hover:text-white transition cursor-pointer">
+                        <ClipboardList size={20} />
+                        <span className="text-xs mt-1">Listone</span>
+                    </Link>
 
                     <Link to="/fixtures" className="hidden md:flex flex-col items-center text-gray-300 hover:text-white transition cursor-pointer">
                         <Calendar size={20} />
@@ -103,6 +108,14 @@ export const Navbar = () => {
                                 <span>La Mia Squadra</span>
                             </Link>
                         )}
+                        <Link
+                            to="/players"
+                            className="flex items-center gap-3 px-6 py-4 text-gray-300 hover:text-white hover:bg-white/10 transition border-b border-white/10"
+                            onClick={closeMobileMenu}
+                        >
+                            <ClipboardList size={20} />
+                            <span>Listone</span>
+                        </Link>
                         <Link
                             to="/fixtures"
                             className="flex items-center gap-3 px-6 py-4 text-gray-300 hover:text-white hover:bg-white/10 transition border-b border-white/10"

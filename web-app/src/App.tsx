@@ -8,6 +8,7 @@ import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { Dashboard } from './pages/Dashboard';
 import { Fixtures } from './pages/Fixtures';
+import { Players } from './pages/Players';
 import { Login } from './pages/Login';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
@@ -75,6 +76,7 @@ function App() {
                                     </ProtectedRoute>
                                 } />
                                 <Route path="/fixtures" element={<Fixtures />} />
+                                <Route path="/players" element={<Players />} />
                                 <Route path="/rules" element={<Rules />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/change-password" element={
