@@ -38,7 +38,6 @@ interface UsePlayersReturn {
     error: string | null;
     refresh: () => Promise<void>;
     teams: string[];
-    teams: string[];
     owners: string[];
     realTeams: RealTeam[]; // New export
 }
