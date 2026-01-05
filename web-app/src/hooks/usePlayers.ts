@@ -16,6 +16,16 @@ export interface Player {
     owner: string | null;
 }
 
+// Interface for Real Team Metadata
+export interface RealTeam {
+    $id: string;
+    name: string;
+    short_name: string;
+    goalkeeper_owner?: string | null;
+    goalkeeper_quotation?: number | null;
+    goalkeeper_purchase_price?: number | null;
+}
+
 interface Team {
     $id: string;
     name: string;
@@ -28,7 +38,9 @@ interface UsePlayersReturn {
     error: string | null;
     refresh: () => Promise<void>;
     teams: string[];
+    teams: string[];
     owners: string[];
+    realTeams: RealTeam[]; // New export
 }
 
 export function usePlayers(): UsePlayersReturn {
@@ -46,9 +58,21 @@ export function usePlayers(): UsePlayersReturn {
             ]);
 
             const teamMap = new Map<string, string>();
+            const realTeamsList: RealTeam[] = []; // Collect full objects
+
             teamsResponse.documents.forEach(doc => {
+                const teamData = {
+                    $id: doc.$id,
+                    name: doc.name,
+                    short_name: doc.short_name,
+                    goalkeeper_owner: doc.goalkeeper_owner,
+                    goalkeeper_quotation: doc.goalkeeper_quotation,
+                    goalkeeper_purchase_price: doc.goalkeeper_purchase_price
+                };
                 teamMap.set(doc.$id, doc.short_name || doc.name);
+                realTeamsList.push(teamData);
             });
+            setRealTeams(realTeamsList); // Update realTeams state
 
             // Fetch all players (paginated if needed)
             let allPlayers: Player[] = [];
@@ -107,12 +131,16 @@ export function usePlayers(): UsePlayersReturn {
         return Array.from(ownerSet).sort();
     }, [players]);
 
+    // Expose realTeams via state or ref? Ideally state.
+    const [realTeams, setRealTeams] = useState<RealTeam[]>([]);
+
     return {
         players,
         loading,
         error,
         refresh: fetchPlayers,
         teams,
-        owners
+        owners,
+        realTeams
     };
 }

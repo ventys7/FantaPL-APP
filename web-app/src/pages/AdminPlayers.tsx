@@ -3,7 +3,9 @@ import { usePlayers, Player } from '../hooks/usePlayers';
 import { databases, COLL_FANTASY_TEAMS, COLL_PLAYERS, DB_ID } from '../lib/appwrite';
 import { Query } from 'appwrite';
 import { createPortal } from 'react-dom';
-import { Search, ChevronDown, ChevronUp, Save, X, Filter, Loader2, Check, Pen, ClipboardList } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Save, X, Filter, Loader2, Check, Pen, ClipboardList, Shield } from 'lucide-react';
+
+const COLL_TEAMS = 'real_teams';
 
 const ROLES = ['Portiere', 'Difensore', 'Centrocampista', 'Attaccante'];
 const ROLE_ORDER: Record<string, number> = { 'Portiere': 1, 'Difensore': 2, 'Centrocampista': 3, 'Attaccante': 4 };
@@ -27,6 +29,8 @@ export const AdminPlayers = () => {
     const [managers, setManagers] = useState<{ name: string, id: string }[]>([]);
     const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+    const [realTeams, setRealTeams] = useState<any[]>([]); // Full team objects for blocks
 
     // Form State
     const [editForm, setEditForm] = useState<any>({});
@@ -35,6 +39,7 @@ export const AdminPlayers = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [teamFilter, setTeamFilter] = useState('Tutti');
     const [roleFilter, setRoleFilter] = useState('Tutti');
+    const [ownerFilter, setOwnerFilter] = useState('Tutti');
 
     // Loading state for updates
     const [saving, setSaving] = useState(false);
@@ -60,6 +65,58 @@ export const AdminPlayers = () => {
         };
         fetchManagers();
     }, []);
+
+    // Fetch Real Teams for Block Management
+    useEffect(() => {
+        if (!isBlockModalOpen) return;
+        const fetchRealTeams = async () => {
+            try {
+                const res = await databases.listDocuments(DB_ID, COLL_TEAMS, [Query.limit(50)]);
+                setRealTeams(res.documents);
+            } catch (e) {
+                console.error("Error fetching teams:", e);
+            }
+        };
+        fetchRealTeams();
+    }, [isBlockModalOpen]);
+
+    const saveBlockOwner = async (teamId: string, ownerId: string | null, quotation: number, purchasePrice: number) => {
+        try {
+            // 1. Update Team Block Owner & Quotation
+            await databases.updateDocument(DB_ID, COLL_TEAMS, teamId, {
+                goalkeeper_owner: ownerId,
+                goalkeeper_quotation: quotation,
+                goalkeeper_purchase_price: purchasePrice
+            });
+
+            // 2. Find all Goalkeepers for this team
+            const playersRes = await databases.listDocuments(DB_ID, COLL_PLAYERS, [
+                Query.equal('team_id', teamId),
+                Query.equal('position', 'Portiere'),
+                Query.limit(10) // Usually 3-4 GKs max
+            ]);
+
+            // 3. Update each player in DB
+            const updatePromises = playersRes.documents.map(doc =>
+                databases.updateDocument(DB_ID, COLL_PLAYERS, doc.$id, {
+                    owner: ownerId
+                })
+            );
+            await Promise.all(updatePromises);
+
+            // 4. Update Local State (Teams & Players)
+            setRealTeams(prev => prev.map(t => t.$id === teamId ? { ...t, goalkeeper_owner: ownerId, goalkeeper_quotation: quotation, goalkeeper_purchase_price: purchasePrice } : t));
+            setLocalPlayers(prev => prev.map(p =>
+                (p.team_id === teamId && p.position === 'Portiere')
+                    ? { ...p, owner: ownerId }
+                    : p
+            ));
+
+        } catch (e) {
+            console.error("Error saving block:", e);
+            alert("Errore salvataggio blocco: " + (e as any).message);
+        }
+    };
 
     const openEditModal = (player: Player) => {
         setEditingPlayer(player);
@@ -113,6 +170,13 @@ export const AdminPlayers = () => {
             if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
             if (teamFilter !== 'Tutti' && p.team_short_name !== teamFilter) return false;
             if (roleFilter !== 'Tutti' && p.position !== roleFilter) return false;
+            if (ownerFilter !== 'Tutti') {
+                if (ownerFilter === 'Svincolati') {
+                    if (p.owner) return false;
+                } else {
+                    if (p.owner !== ownerFilter) return false;
+                }
+            }
             return true;
         });
 
@@ -130,7 +194,7 @@ export const AdminPlayers = () => {
 
             return a.name.localeCompare(b.name);
         });
-    }, [localPlayers, searchQuery, teamFilter, roleFilter]);
+    }, [localPlayers, searchQuery, teamFilter, roleFilter, ownerFilter]);
 
 
     if (loading && localPlayers.length === 0) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-pl-teal" /></div>;
@@ -146,6 +210,14 @@ export const AdminPlayers = () => {
                 <p className="text-gray-400 text-sm mt-1 max-w-md mx-auto">
                     Modifica ruoli, quotazioni e proprietari. Le modifiche sono istantanee.
                 </p>
+
+                <button
+                    onClick={() => setIsBlockModalOpen(true)}
+                    className="mt-4 flex items-center gap-2 px-4 py-2 bg-pl-teal/10 text-pl-teal rounded-xl text-xs font-bold uppercase tracking-wider hover:bg-pl-teal/20 transition border border-pl-teal/20"
+                >
+                    <Shield size={14} />
+                    Gestione Blocchi Portieri
+                </button>
 
                 {/* Search & Filters */}
                 <div className="flex flex-col md:flex-row gap-2 mt-4 w-full max-w-2xl justify-center">
@@ -174,6 +246,18 @@ export const AdminPlayers = () => {
                     >
                         <option value="Tutti">Tutte le Squadre</option>
                         {teams.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+
+                    <select
+                        value={ownerFilter}
+                        onChange={e => setOwnerFilter(e.target.value)}
+                        className="h-[42px] bg-black/30 border border-white/10 rounded-xl px-4 text-sm text-gray-300 outline-none hover:bg-black/40 transition cursor-pointer"
+                    >
+                        <option value="Tutti">Tutti i Proprietari</option>
+                        <option value="Svincolati">Svincolati</option>
+                        {managers.map(m => (
+                            <option key={m.id} value={m.name}>{m.name}</option>
+                        ))}
                     </select>
                 </div>
 
@@ -406,12 +490,17 @@ export const AdminPlayers = () => {
                             </div>
 
                             {/* Owner */}
+                            {/* Owner */}
                             <div className="space-y-1.5">
-                                <label className="text-xs uppercase font-bold text-gray-500 tracking-wider">Proprietario</label>
+                                <label className="text-xs uppercase font-bold text-gray-500 tracking-wider flex justify-between">
+                                    Proprietario
+                                    {editForm.position === 'Portiere' && <span className="text-pl-teal text-[10px] items-center flex gap-1"><Shield size={10} /> Gestito da Blocco Squadra</span>}
+                                </label>
                                 <select
                                     value={editForm.owner}
                                     onChange={e => setEditForm({ ...editForm, owner: e.target.value })}
-                                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-pl-teal outline-none transition"
+                                    disabled={editForm.position === 'Portiere'}
+                                    className={`w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-pl-teal outline-none transition ${editForm.position === 'Portiere' ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     <option value="">-- Svincolato --</option>
                                     {managers.map(m => (
@@ -444,6 +533,79 @@ export const AdminPlayers = () => {
                 </div>,
                 document.body
             )}
-        </div>
+
+            {/* BLOCK MANAGEMENT MODAL */}
+
+            {/* BLOCK MANAGEMENT MODAL */}
+            {
+                isBlockModalOpen && createPortal(
+                    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in" onClick={() => setIsBlockModalOpen(false)} />
+                        <div className="relative w-full max-w-2xl bg-[#18181b] rounded-2xl border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[85vh]">
+                            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-black/20">
+                                <div>
+                                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                        <Shield className="text-pl-teal" size={20} />
+                                        Blocchi Portieri
+                                    </h2>
+                                    <p className="text-gray-400 text-xs mt-1">Assegna l'intero reparto portieri a un manager.</p>
+                                </div>
+                                <button onClick={() => setIsBlockModalOpen(false)} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white"><X size={20} /></button>
+                            </div>
+
+                            <div className="p-6 overflow-y-auto space-y-4">
+                                {realTeams.sort((a, b) => a.name.localeCompare(b.name)).map(team => (
+                                    <div key={team.$id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                                        <div className="flex items-center gap-3">
+                                            {/* Logo placeholder if needed */}
+                                            <span className="font-bold text-white">{team.name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <select
+                                                value={team.goalkeeper_owner || ''}
+                                                onChange={(e) => saveBlockOwner(team.$id, e.target.value || null, team.goalkeeper_quotation || 0, team.goalkeeper_purchase_price || 0)}
+                                                className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-pl-teal outline-none w-32 md:w-36"
+                                            >
+                                                <option value="">-- Nessuno --</option>
+                                                {managers.map(m => (
+                                                    <option key={m.id} value={m.name}>{m.name}</option>
+                                                ))}
+                                            </select>
+
+                                            <div className="flex flex-col w-16">
+                                                <label className="text-[10px] text-gray-500 uppercase font-bold">Quot.</label>
+                                                <input
+                                                    type="number"
+                                                    value={team.goalkeeper_quotation || 0}
+                                                    onChange={(e) => {
+                                                        const val = parseInt(e.target.value);
+                                                        setRealTeams(prev => prev.map(t => t.$id === team.$id ? { ...t, goalkeeper_quotation: val } : t));
+                                                    }}
+                                                    onBlur={(e) => saveBlockOwner(team.$id, team.goalkeeper_owner, parseInt(e.target.value), team.goalkeeper_purchase_price || 0)}
+                                                    className="bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-sm text-white focus:border-pl-teal outline-none text-center font-mono"
+                                                />
+                                            </div>
+
+                                            <div className="flex flex-col w-16">
+                                                <label className="text-[10px] text-gray-500 uppercase font-bold">Prezzo</label>
+                                                <input
+                                                    type="number"
+                                                    value={team.goalkeeper_purchase_price || 0}
+                                                    onChange={(e) => {
+                                                        const val = parseInt(e.target.value);
+                                                        setRealTeams(prev => prev.map(t => t.$id === team.$id ? { ...t, goalkeeper_purchase_price: val } : t));
+                                                    }}
+                                                    onBlur={(e) => saveBlockOwner(team.$id, team.goalkeeper_owner, team.goalkeeper_quotation || 0, parseInt(e.target.value))}
+                                                    className="bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-sm text-pl-teal font-bold focus:border-pl-teal outline-none text-center font-mono"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>, document.body)}
+
+        </div >
     );
 };

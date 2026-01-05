@@ -125,7 +125,8 @@ async function syncPlayers(db, log) {
     const teams = teamsResult.documents.map(t => ({
         dbId: t.$id,
         fotmobId: t.$id.replace('team_', ''),
-        name: t.name
+        name: t.name,
+        goalkeeper_owner: t.goalkeeper_owner // Fetch GK Block owner
     }));
 
     log(`Found ${teams.length} teams in DB.`);
@@ -151,19 +152,32 @@ async function syncPlayers(db, log) {
                     totalPlayers++;
                     const docId = `player_${member.id}`;
 
-                    // Data to update for EXISTING players (only external info)
-                    const updateData = {
-                        fotmob_id: String(member.id),
+                    const role = mapPosition(member.role?.fallback || group.title);
+                    const shortName = member.name.split(' ').pop(); // Fallback
+                    const baseData = {
                         name: member.name,
                         team_id: team.dbId,
                         team_name: team.name,
+                        position: role,
+                        fotmob_id: String(member.id),
+                        shirt_number: member.shirtNumber ? parseInt(member.shirtNumber) : null,
                         image_url: `https://images.fotmob.com/image_resources/playerimages/${member.id}.png`
+                    };
+
+                    // Goalkeeper Block Enforcement
+                    if (role === 'Portiere' && team.goalkeeper_owner) {
+                        baseData.owner = team.goalkeeper_owner;
+                        log(`[GK BLOCK] Assigning ${baseData.name} (${team.name}) to owner: ${team.goalkeeper_owner}`);
+                    }
+
+                    // Data to update for EXISTING players (only external info)
+                    const updateData = {
+                        ...baseData
                     };
 
                     // Data for NEW players (includes defaults)
                     const createData = {
-                        ...updateData,
-                        position: mapPosition(member.role?.fallback || group.title),
+                        ...baseData,
                         quotation: 0,
                         purchase_price: 0,
                         owner: null

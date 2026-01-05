@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Search, Users, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
-import { usePlayers } from '../hooks/usePlayers';
+import { Search, Users, ChevronDown, ChevronUp, Loader2, Shield } from 'lucide-react';
+import { usePlayers, Player } from '../hooks/usePlayers';
 import { useAuth } from '../context/AuthContext';
 
 type SortKey = 'position' | 'quotation' | 'purchase_price' | null;
@@ -33,7 +33,7 @@ const ROLE_ORDER: Record<string, number> = {
 };
 
 export const Players = () => {
-    const { players, loading, error, refresh, teams, owners } = usePlayers();
+    const { players: rawPlayers, loading, error, refresh, teams, owners, realTeams } = usePlayers();
     const { user } = useAuth();
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -58,9 +58,19 @@ export const Players = () => {
         }
     };
 
+    // Expanded Blocks State
+    const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
+
+    const toggleBlock = (teamId: string) => {
+        const newSet = new Set(expandedBlocks);
+        if (newSet.has(teamId)) newSet.delete(teamId);
+        else newSet.add(teamId);
+        setExpandedBlocks(newSet);
+    };
+
     // Filtered players
     const filteredPlayers = useMemo(() => {
-        return players.filter(player => {
+        return rawPlayers.filter(player => {
             // Search filter (only player name)
             if (searchQuery && !player.name.toLowerCase().includes(searchQuery.toLowerCase())) {
                 return false;
@@ -80,13 +90,13 @@ export const Players = () => {
             }
             return true;
         });
-    }, [players, searchQuery, roleFilter, teamFilter, ownerFilter]);
+    }, [rawPlayers, searchQuery, roleFilter, teamFilter, ownerFilter]);
 
-    // Sorted players
-    const sortedPlayers = useMemo(() => {
+    // Sorted & Grouped Players (Blocks)
+    const processedList = useMemo(() => {
         if (!sortKey) return filteredPlayers;
 
-        return [...filteredPlayers].sort((a, b) => {
+        const sorted = [...filteredPlayers].sort((a, b) => {
             if (sortKey === 'position') {
                 // Sort by role, then team, then quotation (desc), then name
                 const roleA = ROLE_ORDER[a.position] || 5;
@@ -99,19 +109,53 @@ export const Players = () => {
                 if (teamDiff !== 0) return teamDiff;
 
                 // Same team: sort by quotation descending
-                const quotationDiff = (b.quotation || 0) - (a.quotation || 0);
+                const aQuot = a.position === 'Portiere' ? (realTeams.find(t => t.$id === a.team_id)?.goalkeeper_quotation || 0) : a.quotation;
+                const bQuot = b.position === 'Portiere' ? (realTeams.find(t => t.$id === b.team_id)?.goalkeeper_quotation || 0) : b.quotation;
+
+                const quotationDiff = (bQuot || 0) - (aQuot || 0);
                 if (quotationDiff !== 0) return quotationDiff;
 
-                // Same quotation: sort by name
                 return a.name.localeCompare(b.name);
             } else {
-                // Numeric sort for quotation/purchase_price
+                // Numeric sort logic needs adjustment for blocks but keeping simple for now
                 const aVal = a[sortKey] || 0;
                 const bVal = b[sortKey] || 0;
                 return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
             }
         });
-    }, [filteredPlayers, sortKey, sortDirection]);
+
+        // Group into Blocks for Goalkeepers
+        const result: any[] = [];
+        const seenTeams = new Set();
+
+        sorted.forEach(p => {
+            if (p.position === 'Portiere') {
+                if (!seenTeams.has(p.team_id)) {
+                    seenTeams.add(p.team_id);
+                    const teamInfo = realTeams.find(t => t.$id === p.team_id);
+                    // Create Block Item
+                    const blockItem = {
+                        isBlock: true,
+                        id: `block-${p.team_id}`,
+                        team_id: p.team_id,
+                        team_name: p.team_name,
+                        team_short_name: p.team_short_name,
+                        position: 'Portiere',
+                        quotation: teamInfo?.goalkeeper_quotation || 0,
+                        purchase_price: teamInfo?.goalkeeper_purchase_price || 0,
+                        owner: teamInfo?.goalkeeper_owner || null, // Block Owner!
+                        players: sorted.filter(sp => sp.position === 'Portiere' && sp.team_id === p.team_id)
+                    };
+                    result.push(blockItem);
+                }
+            } else {
+                result.push(p);
+            }
+        });
+
+        return result;
+
+    }, [filteredPlayers, sortKey, sortDirection, realTeams]);
 
     if (loading) {
         return (
@@ -148,7 +192,7 @@ export const Players = () => {
                             Listone Giocatori
                         </h1>
                         <p className="text-gray-400 mt-1">
-                            {filteredPlayers.length} di {players.length} giocatori
+                            {rawPlayers.length} giocatori in database
                         </p>
                     </div>
 
@@ -378,110 +422,302 @@ export const Players = () => {
 
                     {/* Player Rows - Desktop */}
                     <div className="hidden md:block divide-y divide-white/10">
-                        {sortedPlayers.slice(0, 100).map(player => (
-                            <div
-                                key={player.$id}
-                                className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-white/5 transition group"
-                            >
-                                {/* Player Name & Team */}
-                                <div className="col-span-4 flex items-center gap-3">
-                                    <img
-                                        src={player.image_url}
-                                        alt={player.name}
-                                        className="w-10 h-10 rounded-full bg-gradient-to-br from-pl-purple to-pl-pink object-cover"
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name)}&background=3d195b&color=fff`;
-                                        }}
-                                    />
-                                    <div>
-                                        <div className="font-semibold text-white group-hover:text-pl-teal transition">
-                                            {player.name}
+                        {processedList.slice(0, 100).map(item => {
+                            if (item.isBlock) {
+                                // RENDER BLOCK ROW
+                                const isExpanded = expandedBlocks.has(item.team_id);
+                                const fotmobId = item.team_id.replace('team_', '');
+                                const teamLogoUrl = `https://images.fotmob.com/image_resources/logo/teamlogo/${fotmobId}.png`;
+
+                                return (
+                                    <div key={item.id} className="group">
+                                        <div
+                                            className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-white/5 transition cursor-pointer"
+                                            onClick={() => toggleBlock(item.team_id)}
+                                        >
+                                            {/* Block Name (Matches Player Name Column) */}
+                                            <div className="col-span-4 flex items-center gap-3">
+                                                <div className="relative">
+                                                    <img
+                                                        src={teamLogoUrl}
+                                                        alt={item.team_short_name}
+                                                        className="w-10 h-10 object-contain drop-shadow-md"
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/40?text=?';
+                                                        }}
+                                                    />
+                                                    <div className="absolute -bottom-1 -right-1 bg-pl-dark rounded-full p-0.5">
+                                                        <Shield size={12} className="text-yellow-500" />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div className="font-semibold text-white group-hover:text-pl-teal transition flex items-center gap-2">
+                                                        Blocco {item.team_short_name}
+                                                        <ChevronDown size={14} className={`text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                    </div>
+                                                    <div className="text-sm text-gray-400">Portieri</div>
+                                                </div>
+                                            </div>
+
+                                            {/* Role Badge */}
+                                            <div className="col-span-2 flex items-center">
+                                                <span className={`px-3 py-1 rounded-full text-xs font-medium border ${ROLE_COLORS['Portiere']}`}>
+                                                    P
+                                                </span>
+                                            </div>
+
+                                            {/* Quotation */}
+                                            <div className="col-span-2 flex items-center justify-center">
+                                                <span className="text-xl font-bold text-white">{item.quotation || '—'}</span>
+                                            </div>
+
+                                            {/* Purchase Price (Block Price) */}
+                                            <div className="col-span-2 flex items-center justify-center">
+                                                {item.purchase_price ? (
+                                                    <span className="text-lg font-medium text-pl-teal">{item.purchase_price}</span>
+                                                ) : (
+                                                    <span className="text-gray-500">—</span>
+                                                )}
+                                            </div>
+
+                                            {/* Owner */}
+                                            <div className="col-span-2 flex items-center">
+                                                <span className={`text-sm ${item.owner ? 'text-gray-300' : 'text-gray-500 italic'}`}>
+                                                    {item.owner || 'Svincolato'}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div className="text-sm text-gray-400">{player.team_short_name}</div>
+
+                                        {/* EXPANDED PLAYERS DESKTOP */}
+                                        {isExpanded && (
+                                            <div className="bg-black/20 border-t border-white/5 divide-y divide-white/5">
+                                                {item.players.map((p: any) => (
+                                                    <div key={p.$id} className="grid grid-cols-12 gap-4 px-6 py-3 hover:bg-white/5 transition opacity-80">
+                                                        <div className="col-span-4 flex items-center gap-3 pl-12">
+                                                            <img
+                                                                src={p.image_url}
+                                                                alt={p.name}
+                                                                className="w-8 h-8 rounded-full bg-gradient-to-br from-pl-purple to-pl-pink object-cover"
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=3d195b&color=fff`;
+                                                                }}
+                                                            />
+                                                            <span className="text-sm text-gray-400 font-medium">{p.name}</span>
+                                                        </div>
+                                                        <div className="col-span-2"></div>
+                                                        <div className="col-span-2"></div>
+                                                        {/* Purchase Price for Individual GK */}
+                                                        <div className="col-span-2 flex items-center justify-center">
+                                                            {p.purchase_price ? (
+                                                                <span className="text-sm font-medium text-pl-teal">{p.purchase_price}</span>
+                                                            ) : (
+                                                                <span className="text-xs text-gray-600">—</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="col-span-2"></div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
+                                );
+                            } else {
+                                // RENDER NORMAL PLAYER ROW
+                                return (
+                                    <div
+                                        key={item.$id}
+                                        className="grid grid-cols-12 gap-4 px-6 py-4 hover:bg-white/5 transition group"
+                                    >
+                                        {/* Player Name & Team */}
+                                        <div className="col-span-4 flex items-center gap-3">
+                                            <img
+                                                src={item.image_url}
+                                                alt={item.name}
+                                                className="w-10 h-10 rounded-full bg-gradient-to-br from-pl-purple to-pl-pink object-cover"
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=3d195b&color=fff`;
+                                                }}
+                                            />
+                                            <div>
+                                                <div className="font-semibold text-white group-hover:text-pl-teal transition">
+                                                    {item.name}
+                                                </div>
+                                                <div className="text-sm text-gray-400">{item.team_short_name}</div>
+                                            </div>
+                                        </div>
 
-                                {/* Role Badge */}
-                                <div className="col-span-2 flex items-center">
-                                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${ROLE_COLORS[player.position] || ROLE_COLORS['Unknown']}`}>
-                                        {ROLE_ABBREV[player.position] || '?'}
-                                    </span>
-                                </div>
+                                        {/* Role Badge */}
+                                        <div className="col-span-2 flex items-center">
+                                            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${ROLE_COLORS[item.position] || ROLE_COLORS['Unknown']}`}>
+                                                {ROLE_ABBREV[item.position] || '?'}
+                                            </span>
+                                        </div>
 
-                                {/* Quotation */}
-                                <div className="col-span-2 flex items-center justify-center">
-                                    <span className="text-xl font-bold text-white">{player.quotation || '—'}</span>
-                                </div>
+                                        {/* Quotation */}
+                                        <div className="col-span-2 flex items-center justify-center">
+                                            <span className="text-xl font-bold text-white">{item.quotation || '—'}</span>
+                                        </div>
 
-                                {/* Purchase Price */}
-                                <div className="col-span-2 flex items-center justify-center">
-                                    {player.purchase_price ? (
-                                        <span className="text-lg font-medium text-pl-teal">{player.purchase_price}</span>
-                                    ) : (
-                                        <span className="text-gray-500">—</span>
-                                    )}
-                                </div>
+                                        {/* Purchase Price */}
+                                        <div className="col-span-2 flex items-center justify-center">
+                                            {item.purchase_price ? (
+                                                <span className="text-lg font-medium text-pl-teal">{item.purchase_price}</span>
+                                            ) : (
+                                                <span className="text-gray-500">—</span>
+                                            )}
+                                        </div>
 
-                                {/* Owner */}
-                                <div className="col-span-2 flex items-center">
-                                    <span className={`text-sm ${player.owner ? 'text-gray-300' : 'text-gray-500 italic'}`}>
-                                        {player.owner || 'Svincolato'}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
+                                        {/* Owner */}
+                                        <div className="col-span-2 flex items-center">
+                                            <span className={`text-sm ${item.owner ? 'text-gray-300' : 'text-gray-500 italic'}`}>
+                                                {item.owner || 'Svincolato'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            }
+                        })}
                     </div>
 
                     {/* Player Cards - Mobile */}
                     <div className="md:hidden divide-y divide-white/10">
-                        {sortedPlayers.slice(0, 100).map(player => (
-                            <div
-                                key={player.$id}
-                                className="p-4 hover:bg-white/5 transition"
-                            >
-                                <div className="flex items-start gap-3">
-                                    {/* Player Image */}
-                                    <img
-                                        src={player.image_url}
-                                        alt={player.name}
-                                        className="w-12 h-12 rounded-full bg-gradient-to-br from-pl-purple to-pl-pink object-cover flex-shrink-0"
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(player.name)}&background=3d195b&color=fff`;
-                                        }}
-                                    />
+                        {processedList.slice(0, 100).map(item => {
+                            if (item.isBlock) {
+                                // MOBILE BLOCK CARD
+                                const isExpanded = expandedBlocks.has(item.team_id);
+                                const fotmobId = item.team_id.replace('team_', '');
+                                const teamLogoUrl = `https://images.fotmob.com/image_resources/logo/teamlogo/${fotmobId}.png`;
 
-                                    {/* Player Info */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${ROLE_COLORS[player.position] || ROLE_COLORS['Unknown']}`}>
-                                                {ROLE_ABBREV[player.position] || '?'}
-                                            </span>
-                                            <span className="font-semibold text-white truncate">
-                                                {player.name}
-                                            </span>
-                                        </div>
-                                        <div className="text-xs text-gray-400 mb-2">{player.team_short_name}</div>
-
-                                        {/* Stats Row */}
-                                        <div className="flex items-center gap-4 text-sm">
-                                            <div className="flex items-center gap-1">
-                                                <span className="text-gray-500">Quot:</span>
-                                                <span className="font-bold text-white">{player.quotation || '—'}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                <span className="text-gray-500">Acq:</span>
-                                                <span className="font-medium text-pl-teal">{player.purchase_price || '—'}</span>
-                                            </div>
-                                            {player.owner && (
-                                                <div className="text-gray-400 truncate">
-                                                    👤 {player.owner}
+                                return (
+                                    <div key={item.id} className="group">
+                                        <div
+                                            className="p-4 hover:bg-white/5 transition"
+                                            onClick={() => toggleBlock(item.team_id)}
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                {/* Team Logo (Replaces Player Image) */}
+                                                <div className="relative flex-shrink-0">
+                                                    <img
+                                                        src={teamLogoUrl}
+                                                        alt={item.team_short_name}
+                                                        className="w-12 h-12 object-contain drop-shadow-md"
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/40?text=?';
+                                                        }}
+                                                    />
+                                                    <div className="absolute -bottom-1 -right-1 bg-pl-dark rounded-full p-0.5">
+                                                        <Shield size={12} className="text-yellow-500" />
+                                                    </div>
                                                 </div>
-                                            )}
+
+                                                {/* Info Column */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${ROLE_COLORS['Portiere']}`}>
+                                                            P
+                                                        </span>
+                                                        <span className="font-semibold text-white truncate flex items-center gap-1">
+                                                            Blocco {item.team_short_name}
+                                                            <ChevronDown size={14} className={`text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs text-gray-400 mb-2">Portieri</div>
+
+                                                    {/* Stats Row */}
+                                                    <div className="flex items-center gap-4 text-sm">
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-gray-500">Quot:</span>
+                                                            <span className="font-bold text-white">{item.quotation || '—'}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-gray-500">Acq:</span>
+                                                            <span className="font-medium text-pl-teal">{item.purchase_price || '—'}</span>
+                                                        </div>
+                                                        {item.owner && (
+                                                            <div className="text-gray-400 truncate">
+                                                                👤 {item.owner}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {/* EXPANDED PLAYERS MOBILE */}
+                                        {isExpanded && (
+                                            <div className="bg-black/20 border-t border-white/5 px-4 py-2 space-y-2">
+                                                {item.players.map((p: any) => (
+                                                    <div key={p.$id} className="flex items-center justify-between p-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <img
+                                                                src={p.image_url}
+                                                                alt={p.name}
+                                                                className="w-8 h-8 rounded-full bg-gradient-to-br from-pl-purple to-pl-pink object-cover"
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name)}&background=3d195b&color=fff`;
+                                                                }}
+                                                            />
+                                                            <span className="text-gray-300 text-sm font-medium">{p.name}</span>
+                                                        </div>
+                                                        {p.purchase_price ? (
+                                                            <span className="text-xs font-medium text-pl-teal">{p.purchase_price} cr</span>
+                                                        ) : null}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
+                            // NORMAL MOBILE CARD
+                            return (
+                                <div
+                                    key={item.$id}
+                                    className="p-4 hover:bg-white/5 transition"
+                                >
+                                    <div className="flex items-start gap-3">
+                                        {/* Player Image */}
+                                        <img
+                                            src={item.image_url}
+                                            alt={item.name}
+                                            className="w-12 h-12 rounded-full bg-gradient-to-br from-pl-purple to-pl-pink object-cover flex-shrink-0"
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=3d195b&color=fff`;
+                                            }}
+                                        />
+
+                                        {/* Player Info */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${ROLE_COLORS[item.position] || ROLE_COLORS['Unknown']}`}>
+                                                    {ROLE_ABBREV[item.position] || '?'}
+                                                </span>
+                                                <span className="font-semibold text-white truncate">
+                                                    {item.name}
+                                                </span>
+                                            </div>
+                                            <div className="text-xs text-gray-400 mb-2">{item.team_short_name}</div>
+
+                                            {/* Stats Row */}
+                                            <div className="flex items-center gap-4 text-sm">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-gray-500">Quot:</span>
+                                                    <span className="font-bold text-white">{item.quotation || '—'}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-gray-500">Acq:</span>
+                                                    <span className="font-medium text-pl-teal">{item.purchase_price || '—'}</span>
+                                                </div>
+                                                {item.owner && (
+                                                    <div className="text-gray-400 truncate">
+                                                        👤 {item.owner}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {/* Empty State */}
@@ -492,9 +728,9 @@ export const Players = () => {
                     )}
 
                     {/* Load More Notice */}
-                    {sortedPlayers.length > 100 && (
+                    {processedList.length > 100 && (
                         <div className="px-6 py-4 text-center text-gray-500 text-sm">
-                            Mostrati 100 di {sortedPlayers.length} risultati. Usa i filtri per affinare la ricerca.
+                            Mostrati 100 di {processedList.length} risultati. Usa i filtri per affinare la ricerca.
                         </div>
                     )}
                 </div>
