@@ -407,7 +407,9 @@ const SquadRoleSection = ({ players, role, label, required, countType = 'player'
                                                         <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-500">?</div>
                                                     )}
                                                 </div>
-                                                <span className="truncate">{p.name}</span>
+                                                <span className={`truncate ${p.is_active === false ? 'italic text-gray-500' : ''}`}>
+                                                    {p.name}{p.is_active === false ? '*' : ''}
+                                                </span>
                                             </div>
                                         ))}
                                     </div>
@@ -465,7 +467,9 @@ const SquadRoleSection = ({ players, role, label, required, countType = 'player'
                                         <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-500">?</div>
                                     )}
                                 </div>
-                                <span className="text-sm md:text-base text-gray-200 truncate group-hover:text-white transition font-medium">{p.name}</span>
+                                <span className={`text-sm md:text-base text-gray-200 truncate group-hover:text-white transition font-medium ${p.is_active === false ? 'italic !text-gray-500' : ''}`}>
+                                    {p.name}{p.is_active === false ? '*' : ''}
+                                </span>
                             </div>
 
                             {/* Right: Quotation, Price - Scaled */}
