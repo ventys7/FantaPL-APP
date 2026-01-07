@@ -315,7 +315,7 @@ export const Players = () => {
                             {/* Team Dropdown - Desktop */}
                             <div className="relative">
                                 <button
-                                    onClick={() => { setShowTeamDropdown(!showTeamDropdown); setShowOwnerDropdown(false); }}
+                                    onClick={() => { setShowTeamDropdown(!showTeamDropdown); }}
                                     className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full text-gray-300 hover:bg-white/20 transition text-sm"
                                 >
                                     🏟️ {teamFilter === 'Tutti' ? 'Squadra' : teamFilter}
@@ -351,7 +351,7 @@ export const Players = () => {
                         {/* Role Filter Dropdown - Mobile Only */}
                         <div className="relative md:hidden">
                             <button
-                                onClick={() => { setShowRoleDropdown(!showRoleDropdown); setShowTeamDropdown(false); setShowOwnerDropdown(false); }}
+                                onClick={() => { setShowRoleDropdown(!showRoleDropdown); setShowTeamDropdown(false); }}
                                 className="w-full flex items-center justify-center gap-1 px-3 py-2 bg-white/10 rounded-full text-gray-300 hover:bg-white/20 transition text-sm"
                             >
                                 🎯 <span className="truncate">{roleFilter === 'Tutti' ? 'Ruolo' : roleFilter}</span>
@@ -375,7 +375,7 @@ export const Players = () => {
                         {/* Team Dropdown */}
                         <div className="relative">
                             <button
-                                onClick={() => { setShowTeamDropdown(!showTeamDropdown); setShowOwnerDropdown(false); setShowRoleDropdown(false); }}
+                                onClick={() => { setShowTeamDropdown(!showTeamDropdown); setShowRoleDropdown(false); }}
                                 className="w-full md:w-auto flex items-center justify-center gap-1 px-3 py-2 bg-white/10 rounded-full text-gray-300 hover:bg-white/20 transition text-sm"
                             >
                                 🏟️ <span className="truncate">{teamFilter === 'Tutti' ? 'Squadra' : teamFilter}</span>

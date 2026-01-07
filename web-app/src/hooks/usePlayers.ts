@@ -99,8 +99,6 @@ export function usePlayers(): UsePlayersReturn {
                     image_url: doc.image_url,
                     quotation: doc.quotation || 0,
                     purchase_price: doc.purchase_price || 0,
-                    quotation: doc.quotation || 0,
-                    purchase_price: doc.purchase_price || 0,
                     owner: doc.owner || null,
                     is_active: doc.is_active !== false, // Default to true if missing
                     created_at: doc.$createdAt

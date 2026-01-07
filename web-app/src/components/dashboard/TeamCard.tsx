@@ -6,7 +6,7 @@ interface TeamCardProps {
     managerName: string;
     credits: number;
     logoUrl?: string; // Appwrite URL or placeholder
-    onUpdate: (name: string, logo?: File) => Promise<void>;
+    onUpdate: (name: string, logo?: File | string) => Promise<void>;
 }
 
 export const TeamCard = ({ teamName, managerName, credits, logoUrl, onUpdate }: TeamCardProps) => {
