@@ -11,14 +11,13 @@ const COLL_TEAMS = 'real_teams';
 const ROLES = ['Portiere', 'Difensore', 'Centrocampista', 'Attaccante'];
 const ROLE_ORDER: Record<string, number> = { 'Portiere': 1, 'Difensore': 2, 'Centrocampista': 3, 'Attaccante': 4 };
 
-// "Ghost Admin" logic: hide this ID from owner list
-const ADMIN_ID = '695842e1003a3db19fea';
+
 
 export const AdminPlayers = () => {
     // Players Hook
     // Note: 'players' from hook is usually just an array. We need to handle updates manually for optimistic UI.
     const { players: initialPlayers, loading, error, refresh, teams } = usePlayers();
-    const { user } = useAuth();
+    const { user, hasRole } = useAuth();
 
     // Local players state for optimistic updates
     const [localPlayers, setLocalPlayers] = useState<Player[]>([]);
@@ -64,7 +63,7 @@ export const AdminPlayers = () => {
                     Query.equal('hidden', false)
                 ]);
                 const managerList = res.documents
-                    .filter(d => d.user_id !== ADMIN_ID) // Ghost Admin Filter
+                    .filter(d => d.role !== 'g_admin') // Ghost Admin Filter (Role-Based)
                     .map(d => ({
                         name: d.manager_name,
                         id: d.$id
@@ -303,8 +302,8 @@ export const AdminPlayers = () => {
                         Gestione Blocchi Portieri
                     </button>
 
-                    {/* Only visible to main admin */}
-                    {user?.$id === ADMIN_ID && (
+                    {/* Only visible to Ghost Admin */}
+                    {hasRole('g_admin') && (
                         <button
                             onClick={resetAllSquads}
                             disabled={saving}

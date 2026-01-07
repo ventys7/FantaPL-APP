@@ -60,7 +60,8 @@ export const TeamsList = () => {
         // Let's assume `teams` has the data structure: { $id, manager_name, team_name, logo_url, credits_remaining, hidden, role }
 
         // Filter valid teams
-        const activeTeams = fantasyTeams.filter((t: any) => !t.hidden && t.manager_name !== 'Admin'); // Exclude Admin & Hidden
+        // Filter valid teams - Exclude Admin, Hidden, and 'g_admin' role
+        const activeTeams = fantasyTeams.filter((t: any) => !t.hidden && t.manager_name !== 'Admin' && t.role !== 'g_admin');
 
         const analysis = activeTeams.map((team: any) => {
             const managerName = team.manager_name || 'N/A';
@@ -114,7 +115,7 @@ export const TeamsList = () => {
                 roleCounts.C === 8 &&
                 roleCounts.A === 6;
 
-            const remaining = team.credits ?? 500;
+            const remaining = team.credits_remaining ?? 500;
 
             return {
                 managerName,

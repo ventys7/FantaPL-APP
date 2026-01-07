@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Shirt, RefreshCw, AlertCircle } from 'lucide-react';
 import { functions } from '../lib/appwrite';
 import { ExecutionMethod } from 'appwrite';
+import { usePlayers } from '../hooks/usePlayers';
 
 const FETCH_LINEUPS_FUNCTION_ID = '6959a2f4001012412402'; // v1 deployed
 
@@ -12,6 +13,7 @@ interface MatchSheetProps {
 }
 
 export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
+    const { players: fantasyPlayers } = usePlayers();
     const [loading, setLoading] = useState(false);
     const [lineups, setLineups] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
@@ -99,6 +101,15 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
         }
     };
 
+    const getFantasyRole = (fotmobPlayerId: number | string) => {
+        if (!fantasyPlayers || fantasyPlayers.length === 0) return null;
+
+        // Exact Match by FotMob ID (Robust)
+        const match = fantasyPlayers.find(p => String(p.fotmob_id) === String(fotmobPlayerId));
+
+        return match ? match.position : null;
+    };
+
     const renderFormation = (teamLineup: any, isHome: boolean) => {
         if (!teamLineup || !teamLineup.lineup) return (
             <div className="flex flex-col items-center justify-center p-8 text-gray-400 italic">
@@ -153,7 +164,20 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                 }
             }
 
-            // Append minutes to events list just for rendering? No, render separate badge.
+            // FANTASY ROLE LOGIC
+            const fantasyRole = getFantasyRole(p.id) || p.position; // Fallback to FotMob position if not found
+
+
+
+            const getRoleStyle = (role: string) => {
+                switch (role) {
+                    case 'Portiere': return 'text-yellow-500';
+                    case 'Difensore': return 'text-blue-500';
+                    case 'Centrocampista': return 'text-green-500';
+                    case 'Attaccante': return 'text-red-500';
+                    default: return 'text-gray-500';
+                }
+            };
 
             return (
                 <div key={p.id} className={`flex items-center gap-3 ${isBench ? 'p-1.5' : 'p-2 bg-white/5'} rounded hover:bg-white/10 transition group`}>
@@ -175,7 +199,7 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                     <div className="flex flex-col min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 overflow-hidden">
-                                <span className={`font-semibold truncate ${isBench ? 'text-gray-400 group-hover:text-white text-xs' : 'text-sm'}`}>{p.name}</span>
+                                <span className={`font-semibold truncate ${isBench ? 'text-gray-400 group-hover:text-white text-sm' : 'text-base'}`}>{p.name}</span>
                                 {/* Inline Events Icons */}
                                 {events && events.map((e: any, i: number) => {
                                     // Event types: Goal, OwnGoal, Card, SubIn, SubOut, Assist, PenaltySaved
@@ -213,15 +237,18 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                             </div>
 
                             {/* Effective Minutes Badge */}
+                            {/* Effective Minutes Badge */}
                             {(minutesPlayed > 0) && (
                                 <div className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${isBench ? 'bg-green-900/40 border-green-500/30 text-green-400' : 'bg-white/10 border-white/20 text-gray-300'}`} title={`Played ${minutesPlayed} minutes`}>
                                     {minutesPlayed}'
                                 </div>
                             )}
                         </div>
-                        {!isBench && <span className="text-[10px] text-gray-500">{p.position}</span>}
+                        <span className={`${isBench ? 'text-[9px]' : 'text-[10px]'} font-bold uppercase tracking-wider ${getRoleStyle(fantasyRole)}`}>
+                            {fantasyRole}
+                        </span>
                     </div>
-                </div>
+                </div >
             )
         };
 

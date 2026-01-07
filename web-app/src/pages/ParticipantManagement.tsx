@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { account, databases, functions, COLL_FANTASY_TEAMS, DB_ID } from '../lib/appwrite';
 import { ID, Query, ExecutionMethod } from 'appwrite';
 import { User, UserRole } from '../types/shared';
-import { Trash2, Edit2, Shield, UserPlus, Users, RefreshCw, Lock, Unlock, ChevronUp, ChevronDown, Search, X } from 'lucide-react';
+import { Trash2, Edit2, Shield, UserPlus, Users, RefreshCw, Lock, Unlock, ChevronUp, ChevronDown, Search, X, Coins } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 type SortKey = 'name' | 'role';
@@ -43,6 +43,7 @@ export function ParticipantManagement() {
             const mappedUsers = response.documents.map(doc => ({
                 $id: doc.user_id || doc.$id,
                 name: doc.manager_name,
+                credits: doc.credits_remaining ?? 500, // Map credits (default 500)
                 email: 'N/A',
                 status: !doc.hidden, // hidden=true means disabled/inactive
                 prefs: {
@@ -51,9 +52,9 @@ export function ParticipantManagement() {
                 }
             })) as unknown as User[];
 
-            // Filter Ghost Admin: Visible ONLY to himself
+            // Filter Ghost Admin (g_admin role): Visible ONLY to himself
             const filteredUsers = mappedUsers.filter(u =>
-                u.$id !== GHOST_ADMIN_ID || currentUser?.$id === GHOST_ADMIN_ID
+                u.prefs.role !== 'g_admin' || currentUser?.$id === u.$id
             );
 
             setUsers(filteredUsers);
@@ -232,6 +233,28 @@ export function ParticipantManagement() {
         }
     };
 
+    const handleUpdateBudget = async (docId: string, currentBudget: number, name: string) => {
+        const input = prompt(`Modifica Budget per ${name}:`, currentBudget.toString());
+        if (input === null) return; // Cancelled
+
+        const newBudget = parseInt(input);
+        if (isNaN(newBudget)) {
+            alert('Inserisci un numero valido.');
+            return;
+        }
+
+        try {
+            await databases.updateDocument(DB_ID, COLL_FANTASY_TEAMS, docId, {
+                credits_remaining: newBudget,
+            });
+            // Construct a "fake" event or just reload
+            // Ideally optimistic update, but reload is safer for sync
+            loadUsers();
+        } catch (e: any) {
+            alert(`Errore aggiornamento budget: ${e.message}`);
+        }
+    };
+
     const SortIcon = ({ colKey }: { colKey: SortKey }) => {
         if (sortConfig.key !== colKey) return <div className="w-3 h-3 opacity-0" />;
         return sortConfig.direction === 'asc' ? <ChevronUp size={14} className="text-pl-teal" /> : <ChevronDown size={14} className="text-pl-teal" />;
@@ -274,11 +297,10 @@ export function ParticipantManagement() {
             </div>
 
             {/* Admin Note Box */}
-            {currentUser?.name?.toLowerCase() === 'admin' && (
+            {currentUser?.prefs?.role === 'g_admin' && (
                 <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-xl text-xs md:text-sm text-yellow-200/80">
                     <h4 className="font-bold flex items-center gap-2 mb-2 text-yellow-200"><Shield size={14} /> Note Admin</h4>
                     <ul className="list-disc list-inside space-y-1 opacity-80">
-                        <li><strong>Reset Password:</strong> Forza il reset al prossimo login. Non cambia la password Auth se l'utente l'ha scordata (Eliminare e Ricreare).</li>
                         <li><strong>Eliminazione:</strong> Rimuove solo i dati FantaPL. Rimuovere l'utente Auth manualmente dalla Console.</li>
                     </ul>
                 </div>
@@ -332,6 +354,7 @@ export function ParticipantManagement() {
                                 <option value="user">Utente</option>
                                 <option value="helper">Helper</option>
                                 <option value="admin">Admin</option>
+                                {currentUser?.prefs?.role === 'g_admin' && <option value="g_admin">Ghost Admin</option>}
                             </select>
                         </div>
                         <div className="md:col-span-2 lg:col-span-4 flex justify-end gap-3 mt-4 pt-4 border-t border-white/5">
@@ -373,7 +396,20 @@ export function ParticipantManagement() {
                                         />
 
                                         <div className="flex flex-col">
-                                            <span className="font-bold text-white text-base">{u.name}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-white text-base">{u.name}</span>
+                                                {/* Budget Badge - Hidden for Ghost Admin */}
+                                                {u.$id !== GHOST_ADMIN_ID && (
+                                                    <button
+                                                        onClick={() => handleUpdateBudget(u.prefs.teamId!, (u as any).credits, u.name)}
+                                                        className="text-xs bg-white/10 hover:bg-white/20 px-1.5 py-0.5 rounded text-pl-teal font-mono flex items-center gap-1 transition"
+                                                        title="Modifica Budget"
+                                                    >
+                                                        <Coins size={10} />
+                                                        {((u as any).credits)} cr
+                                                    </button>
+                                                )}
+                                            </div>
                                             <span className="text-xs text-gray-600 font-mono hidden group-hover:block transition-opacity select-all">{u.$id}</span>
                                         </div>
                                         {u.prefs?.teamId === currentUser?.prefs?.teamId && <span className="px-2 py-0.5 bg-pl-teal/10 text-pl-teal text-[10px] font-bold uppercase rounded ml-2">Tu</span>}
@@ -383,11 +419,13 @@ export function ParticipantManagement() {
                                     <select
                                         value={u.prefs.role}
                                         onChange={(e) => handleUpdateRole(u.prefs.teamId!, e.target.value as UserRole, u.name)}
-                                        className="bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:text-white outline-none focus:border-white/20 hover:bg-white/5 transition cursor-pointer"
+                                        disabled={u.prefs.role === 'g_admin' && currentUser?.$id !== u.$id}
+                                        className={`bg-black/20 border border-white/10 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-white/20 hover:bg-white/5 transition cursor-pointer ${u.prefs.role === 'g_admin' ? 'text-pl-teal font-extrabold cursor-not-allowed opacity-70' : 'text-gray-300 focus:text-white'}`}
                                     >
                                         <option value="user">Utente</option>
                                         <option value="helper">Helper</option>
                                         <option value="admin">Admin</option>
+                                        {currentUser?.prefs?.role === 'g_admin' && <option value="g_admin">Ghost Admin</option>}
                                     </select>
                                 </td>
                                 {/* REMOVED STATUS COLUMN CELL */}
@@ -425,7 +463,19 @@ export function ParticipantManagement() {
                                 {/* Status Dot Mobile */}
                                 <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${u.status ? 'bg-emerald-500' : 'bg-red-500'}`} />
                                 <div>
-                                    <div className="font-bold text-lg text-white leading-tight">{u.name}</div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="font-bold text-lg text-white leading-tight">{u.name}</div>
+                                        {/* Budget Badge Mobile - Hidden for Ghost Admin */}
+                                        {u.$id !== GHOST_ADMIN_ID && (
+                                            <button
+                                                onClick={() => handleUpdateBudget(u.prefs.teamId!, (u as any).credits, u.name)}
+                                                className="text-[10px] bg-white/10 hover:bg-white/20 px-1.5 py-0.5 rounded text-pl-teal font-mono flex items-center gap-1 transition"
+                                            >
+                                                <Coins size={10} />
+                                                {((u as any).credits)} cr
+                                            </button>
+                                        )}
+                                    </div>
                                     <div className="text-[10px] text-gray-600 font-mono mt-0.5">{u.$id}</div>
                                 </div>
                             </div>
@@ -450,6 +500,7 @@ export function ParticipantManagement() {
                                     <option value="user">Utente</option>
                                     <option value="helper">Helper</option>
                                     <option value="admin">Admin</option>
+                                    {currentUser?.prefs?.role === 'g_admin' && <option value="g_admin">Ghost Admin</option>}
                                 </select>
                             </div>
                             {/* REMOVED STATUS TEXT BOX ON MOBILE too, inferred by Color/Dot */}

@@ -7,7 +7,7 @@ export interface AppwriteDocument {
     $databaseId: string;
 }
 
-export type UserRole = 'admin' | 'helper' | 'user';
+export type UserRole = 'admin' | 'helper' | 'user' | 'g_admin';
 
 export interface User {
     $id: string;

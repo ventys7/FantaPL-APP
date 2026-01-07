@@ -124,21 +124,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
     };
 
-    const hasRole = (role: UserRole): boolean => {
+    const hasRole = (requiredRole: UserRole): boolean => {
         if (!user || !user.prefs?.role) return false;
 
         const userRole = user.prefs.role;
 
-        // Admin has access to everything
-        if (userRole === 'admin') return true;
+        // 1. g_admin has access to EVERYTHING
+        if (userRole === 'g_admin') return true;
 
-        // Helper has access to helper and user stuff
-        if (role === 'helper') return userRole === 'helper';
+        // 2. admin has access to everything EXCEPT g_admin
+        if (userRole === 'admin') {
+            return requiredRole !== 'g_admin';
+        }
 
-        // User role check
-        if (role === 'user') return true; // Everyone is at least user
+        // 3. helper has access to helper and user
+        if (userRole === 'helper') {
+            return requiredRole === 'helper' || requiredRole === 'user';
+        }
 
-        return false;
+        // 4. user has access only to user
+        return requiredRole === 'user';
     };
 
     return (

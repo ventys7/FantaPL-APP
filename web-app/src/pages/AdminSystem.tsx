@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { functions } from '../lib/appwrite';
-import { RefreshCw, CheckCircle, XCircle, Activity, Terminal, Database, Server, Shield, Users } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, Activity, Terminal, Database, Server, Shield, Users, Trash2, Lock } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { logger } from '../lib/logger';
 
 export function AdminSystem() {
+    const { hasRole } = useAuth();
     const [loading, setLoading] = useState<string | null>(null);
     const [log, setLog] = useState<{ type: 'success' | 'error' | 'info'; message: string }[]>([]);
 
     // Function IDs
     const PL_FUNCTION_ID = '69592373002208d6dd31'; // fetch_pl_data
     const PLAYERS_FUNCTION_ID = '695afdb40034ed9a82d7'; // sync_players
+    const RESET_SQUADS_FUNCTION_ID = 'reset_squads'; // TODO: Update with actual ID
 
     const executeFunction = async (funcId: string, action: string, season?: number) => {
         setLoading(action);
@@ -111,6 +114,9 @@ export function AdminSystem() {
                         </button>
                     </div>
                 </div>
+
+
+
             </div>
 
             {/* Terminal Logs */}
