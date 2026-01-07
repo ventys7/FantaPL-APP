@@ -21,6 +21,7 @@ const AdminLayout = lazy(() => import('./components/AdminLayout').then(module =>
 const ParticipantManagement = lazy(() => import('./pages/ParticipantManagement').then(module => ({ default: module.ParticipantManagement })));
 const AdminSystem = lazy(() => import('./pages/AdminSystem').then(module => ({ default: module.AdminSystem })));
 const AdminPlayers = lazy(() => import('./pages/AdminPlayers').then(module => ({ default: module.AdminPlayers })));
+const TeamsList = lazy(() => import('./pages/TeamsList').then(module => ({ default: module.TeamsList })));
 
 
 function AdminIndex() {
@@ -86,6 +87,7 @@ function App() {
                                 } />
                                 <Route path="/fixtures" element={<Fixtures />} />
                                 <Route path="/players" element={<Players />} />
+                                <Route path="/teams" element={<ProtectedRoute><TeamsList /></ProtectedRoute>} /> {/* New Route */}
                                 <Route path="/rules" element={<Rules />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/change-password" element={

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Users, ChevronDown, ChevronUp, Loader2, Shield } from 'lucide-react';
+import { Search, Users, ChevronDown, ChevronUp, Loader2, Shield, Sparkles, UserX } from 'lucide-react';
 import { usePlayers, Player } from '../hooks/usePlayers';
 import { useAuth } from '../context/AuthContext';
 
@@ -39,9 +39,9 @@ export const Players = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState('Tutti');
     const [teamFilter, setTeamFilter] = useState('Tutti');
-    const [ownerFilter, setOwnerFilter] = useState('Tutti');
+    const [showNewOnly, setShowNewOnly] = useState(false);
+    const [showFreeAgentsOnly, setShowFreeAgentsOnly] = useState(false); // New Filter State
     const [showTeamDropdown, setShowTeamDropdown] = useState(false);
-    const [showOwnerDropdown, setShowOwnerDropdown] = useState(false);
     const [showRoleDropdown, setShowRoleDropdown] = useState(false);
 
     // Sorting state - default to role ascending
@@ -50,11 +50,18 @@ export const Players = () => {
 
     const handleSort = (key: SortKey) => {
         if (sortKey === key) {
-            // Toggle direction (no clear for role)
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+            // Cycle: desc -> asc -> reset to role
+            if (sortDirection === 'desc') {
+                setSortDirection('asc');
+            } else {
+                // Was asc, reset to default (role asc)
+                setSortKey('position');
+                setSortDirection('asc');
+            }
         } else {
+            // New column: start with descending
             setSortKey(key);
-            setSortDirection('asc');
+            setSortDirection('desc');
         }
     };
 
@@ -71,10 +78,19 @@ export const Players = () => {
     // Filtered players
     const filteredPlayers = useMemo(() => {
         return rawPlayers.filter(player => {
+            // "New" Filter (Takes Priority) - handled in processedList usually but let's see logic flow
+            // Actually, keep logic here consistent.
+
             // Search filter (only player name)
             if (searchQuery && !player.name.toLowerCase().includes(searchQuery.toLowerCase())) {
                 return false;
             }
+
+            // Svincolati Filter
+            if (showFreeAgentsOnly) {
+                if (player.owner) return false; // Must have NO owner
+            }
+
             // Role filter
             if (roleFilter !== 'Tutti' && player.position !== roleFilter) {
                 return false;
@@ -83,20 +99,38 @@ export const Players = () => {
             if (teamFilter !== 'Tutti' && player.team_short_name !== teamFilter) {
                 return false;
             }
-            // Owner filter
-            const playerOwner = player.owner || 'Svincolato';
-            if (ownerFilter !== 'Tutti' && playerOwner !== ownerFilter) {
-                return false;
-            }
+
             return true;
         });
-    }, [rawPlayers, searchQuery, roleFilter, teamFilter, ownerFilter]);
+    }, [rawPlayers, searchQuery, roleFilter, teamFilter, showFreeAgentsOnly]);
 
     // Sorted & Grouped Players (Blocks)
     const processedList = useMemo(() => {
+        // "New" Filter: Show ONLY players from the last sync (detected by proximity to the latest created_at)
+        if (showNewOnly && rawPlayers.length > 0) {
+            const timestamps = rawPlayers.map(p => new Date(p.created_at).getTime());
+            const latestTimestamp = Math.max(...timestamps);
+            // Assume a sync takes at most 20 minutes. We show players created in that "last batch".
+            const threshold = latestTimestamp - (20 * 60 * 1000); // 20 minutes
+
+            const newPlayers = filteredPlayers.filter(p => new Date(p.created_at).getTime() > threshold);
+            return newPlayers.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        }
+
         if (!sortKey) return filteredPlayers;
 
-        const sorted = [...filteredPlayers].sort((a, b) => {
+        // When sorting by price, exclude items with price 0
+        let toSort = filteredPlayers;
+        if (sortKey === 'purchase_price') {
+            toSort = filteredPlayers.filter(p => {
+                const price = p.position === 'Portiere'
+                    ? (realTeams.find(t => t.$id === p.team_id)?.goalkeeper_purchase_price || 0)
+                    : (p.purchase_price || 0);
+                return price > 0;
+            });
+        }
+
+        const sorted = [...toSort].sort((a, b) => {
             if (sortKey === 'position') {
                 // Sort by role, then team, then quotation (desc), then name
                 const roleA = ROLE_ORDER[a.position] || 5;
@@ -116,8 +150,26 @@ export const Players = () => {
                 if (quotationDiff !== 0) return quotationDiff;
 
                 return a.name.localeCompare(b.name);
+            } else if (sortKey === 'quotation') {
+                // For GKs, use block quotation from realTeams
+                const aQuot = a.position === 'Portiere'
+                    ? (realTeams.find(t => t.$id === a.team_id)?.goalkeeper_quotation || 0)
+                    : (a.quotation || 0);
+                const bQuot = b.position === 'Portiere'
+                    ? (realTeams.find(t => t.$id === b.team_id)?.goalkeeper_quotation || 0)
+                    : (b.quotation || 0);
+                return sortDirection === 'asc' ? aQuot - bQuot : bQuot - aQuot;
+            } else if (sortKey === 'purchase_price') {
+                // For GKs, use block purchase_price from realTeams
+                const aPrice = a.position === 'Portiere'
+                    ? (realTeams.find(t => t.$id === a.team_id)?.goalkeeper_purchase_price || 0)
+                    : (a.purchase_price || 0);
+                const bPrice = b.position === 'Portiere'
+                    ? (realTeams.find(t => t.$id === b.team_id)?.goalkeeper_purchase_price || 0)
+                    : (b.purchase_price || 0);
+                return sortDirection === 'asc' ? aPrice - bPrice : bPrice - aPrice;
             } else {
-                // Numeric sort logic needs adjustment for blocks but keeping simple for now
+                // Numeric sort logic for other keys
                 const aVal = a[sortKey] || 0;
                 const bVal = b[sortKey] || 0;
                 return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
@@ -155,7 +207,7 @@ export const Players = () => {
 
         return result;
 
-    }, [filteredPlayers, sortKey, sortDirection, realTeams]);
+    }, [filteredPlayers, sortKey, sortDirection, realTeams, showNewOnly]);
 
     if (loading) {
         return (
@@ -196,9 +248,9 @@ export const Players = () => {
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         {/* Search Bar */}
-                        <div className="relative flex-1 max-w-md">
+                        <div className="relative flex-1 max-w-md min-w-[200px] md:w-80">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                             <input
                                 type="text"
@@ -209,6 +261,31 @@ export const Players = () => {
                             />
                         </div>
 
+                        {/* Nuovi Button (Desktop & Mobile) */}
+                        <button
+                            onClick={() => setShowNewOnly(!showNewOnly)}
+                            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition border whitespace-nowrap ${showNewOnly
+                                ? 'bg-pl-teal text-pl-dark border-pl-teal'
+                                : 'bg-white/10 text-gray-300 border-white/10 hover:bg-white/20'
+                                }`}
+                            title="Mostra solo nuovi giocatori"
+                        >
+                            <Sparkles size={20} />
+                            <span className="hidden md:inline">Nuovi</span>
+                        </button>
+
+                        {/* Svincolati Button (Desktop & Mobile) */}
+                        <button
+                            onClick={() => setShowFreeAgentsOnly(!showFreeAgentsOnly)}
+                            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition border whitespace-nowrap ${showFreeAgentsOnly
+                                ? 'bg-pl-teal text-pl-dark border-pl-teal'
+                                : 'bg-white/10 text-gray-300 border-white/10 hover:bg-white/20'
+                                }`}
+                            title="Mostra solo giocatori svincolati"
+                        >
+                            <UserX size={20} />
+                            <span className="hidden md:inline">Svincolati</span>
+                        </button>
                     </div>
                 </div>
 
@@ -221,7 +298,7 @@ export const Players = () => {
                             {ROLES.map(role => (
                                 <button
                                     key={role}
-                                    onClick={() => setRoleFilter(role)}
+                                    onClick={() => { setRoleFilter(role); setShowFreeAgentsOnly(false); }} // Disable free agents filter when selecting a role
                                     className={`px-4 py-2 rounded-full text-sm font-medium transition ${roleFilter === role
                                         ? 'bg-pl-teal text-pl-dark'
                                         : 'bg-white/10 text-gray-300 hover:bg-white/20'
@@ -264,41 +341,13 @@ export const Players = () => {
                                     </div>
                                 )}
                             </div>
-
-                            {/* Owner Dropdown - Desktop */}
-                            <div className="relative">
-                                <button
-                                    onClick={() => { setShowOwnerDropdown(!showOwnerDropdown); setShowTeamDropdown(false); }}
-                                    className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full text-gray-300 hover:bg-white/20 transition text-sm"
-                                >
-                                    👤 {ownerFilter === 'Tutti' ? 'Proprietario' : ownerFilter}
-                                    <ChevronDown size={14} className={`transition ${showOwnerDropdown ? 'rotate-180' : ''}`} />
-                                </button>
-                                {showOwnerDropdown && (
-                                    <div className="absolute top-full mt-2 right-0 bg-pl-dark border border-white/20 rounded-xl shadow-xl z-20 max-h-64 overflow-y-auto min-w-[180px]">
-                                        <button
-                                            onClick={() => { setOwnerFilter('Tutti'); setShowOwnerDropdown(false); }}
-                                            className={`w-full text-left px-4 py-2 hover:bg-white/10 transition text-sm ${ownerFilter === 'Tutti' ? 'text-pl-teal' : 'text-gray-300'}`}
-                                        >
-                                            Tutti
-                                        </button>
-                                        {owners.map(owner => (
-                                            <button
-                                                key={owner}
-                                                onClick={() => { setOwnerFilter(owner); setShowOwnerDropdown(false); }}
-                                                className={`w-full text-left px-4 py-2 hover:bg-white/10 transition text-sm ${ownerFilter === owner ? 'text-pl-teal' : 'text-gray-300'}`}
-                                            >
-                                                {owner}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
                         </div>
                     </div>
 
+
+
                     {/* Mobile: 3 dropdowns in a row */}
-                    <div className="grid grid-cols-3 gap-2 md:hidden">
+                    <div className="grid grid-cols-2 gap-2 md:hidden">
                         {/* Role Filter Dropdown - Mobile Only */}
                         <div className="relative md:hidden">
                             <button
@@ -352,36 +401,6 @@ export const Players = () => {
                                 </div>
                             )}
                         </div>
-
-                        {/* Owner Dropdown */}
-                        <div className="relative">
-                            <button
-                                onClick={() => { setShowOwnerDropdown(!showOwnerDropdown); setShowTeamDropdown(false); setShowRoleDropdown(false); }}
-                                className="w-full md:w-auto flex items-center justify-center gap-1 px-3 py-2 bg-white/10 rounded-full text-gray-300 hover:bg-white/20 transition text-sm"
-                            >
-                                👤 <span className="truncate">{ownerFilter === 'Tutti' ? 'Proprietario' : ownerFilter}</span>
-                                <ChevronDown size={14} className={`flex-shrink-0 transition ${showOwnerDropdown ? 'rotate-180' : ''}`} />
-                            </button>
-                            {showOwnerDropdown && (
-                                <div className="absolute top-full mt-2 right-0 bg-pl-dark border border-white/20 rounded-xl shadow-xl z-20 max-h-64 overflow-y-auto min-w-[180px]">
-                                    <button
-                                        onClick={() => { setOwnerFilter('Tutti'); setShowOwnerDropdown(false); }}
-                                        className={`w-full text-left px-4 py-2 hover:bg-white/10 transition text-sm ${ownerFilter === 'Tutti' ? 'text-pl-teal' : 'text-gray-300'}`}
-                                    >
-                                        Tutti
-                                    </button>
-                                    {owners.map(owner => (
-                                        <button
-                                            key={owner}
-                                            onClick={() => { setOwnerFilter(owner); setShowOwnerDropdown(false); }}
-                                            className={`w-full text-left px-4 py-2 hover:bg-white/10 transition text-sm ${ownerFilter === owner ? 'text-pl-teal' : 'text-gray-300'}`}
-                                        >
-                                            {owner}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
                     </div>
                 </div>
 
@@ -412,7 +431,7 @@ export const Players = () => {
                             className="col-span-2 text-center flex items-center justify-center gap-1 cursor-pointer hover:text-white transition"
                             onClick={() => handleSort('purchase_price')}
                         >
-                            Acquisto
+                            Prezzo
                             {sortKey === 'purchase_price' && (
                                 sortDirection === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
                             )}
@@ -422,7 +441,7 @@ export const Players = () => {
 
                     {/* Player Rows - Desktop */}
                     <div className="hidden md:block divide-y divide-white/10">
-                        {processedList.slice(0, 100).map(item => {
+                        {processedList.slice(0, (roleFilter !== 'Tutti' || showFreeAgentsOnly) ? undefined : 100).map(item => {
                             if (item.isBlock) {
                                 // RENDER BLOCK ROW
                                 const isExpanded = expandedBlocks.has(item.team_id);
@@ -539,8 +558,8 @@ export const Players = () => {
                                                 }}
                                             />
                                             <div>
-                                                <div className="font-semibold text-white group-hover:text-pl-teal transition">
-                                                    {item.name}
+                                                <div className={`font-semibold transition ${item.is_active ? 'text-white group-hover:text-pl-teal' : 'text-gray-500 italic decoration-slate-600'}`}>
+                                                    {item.name} {!item.is_active && '*'}
                                                 </div>
                                                 <div className="text-sm text-gray-400">{item.team_short_name}</div>
                                             </div>
@@ -581,7 +600,7 @@ export const Players = () => {
 
                     {/* Player Cards - Mobile */}
                     <div className="md:hidden divide-y divide-white/10">
-                        {processedList.slice(0, 100).map(item => {
+                        {processedList.slice(0, (roleFilter !== 'Tutti' || showFreeAgentsOnly) ? undefined : 100).map(item => {
                             if (item.isBlock) {
                                 // MOBILE BLOCK CARD
                                 const isExpanded = expandedBlocks.has(item.team_id);
@@ -691,8 +710,8 @@ export const Players = () => {
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${ROLE_COLORS[item.position] || ROLE_COLORS['Unknown']}`}>
                                                     {ROLE_ABBREV[item.position] || '?'}
                                                 </span>
-                                                <span className="font-semibold text-white truncate">
-                                                    {item.name}
+                                                <span className={`font-semibold truncate ${item.is_active ? 'text-white' : 'text-gray-500 italic decoration-slate-600'}`}>
+                                                    {item.name} {!item.is_active && '*'}
                                                 </span>
                                             </div>
                                             <div className="text-xs text-gray-400 mb-2">{item.team_short_name}</div>
@@ -728,7 +747,7 @@ export const Players = () => {
                     )}
 
                     {/* Load More Notice */}
-                    {processedList.length > 100 && (
+                    {processedList.length > 100 && roleFilter === 'Tutti' && !showFreeAgentsOnly && (
                         <div className="px-6 py-4 text-center text-gray-500 text-sm">
                             Mostrati 100 di {processedList.length} risultati. Usa i filtri per affinare la ricerca.
                         </div>

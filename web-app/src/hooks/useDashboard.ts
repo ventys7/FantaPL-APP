@@ -57,7 +57,7 @@ export const useDashboard = () => {
                 name: doc.team_name,
                 manager: doc.manager_name,
                 credits: doc.credits_remaining,
-                logoUrl: doc.logo_url,
+                logoUrl: doc.fantasylogo_url,
                 // Placeholders
                 score: 0,
                 opponent: "Prossimo Avversario",
@@ -70,23 +70,28 @@ export const useDashboard = () => {
         }
     };
 
-    const updateTeamDetails = async (newName: string, logoFile?: File) => {
+    const updateTeamDetails = async (newName: string, logo?: File | string) => {
         if (!team?.id) return;
 
         try {
             let logoUrl = team.logoUrl;
 
-            if (logoFile) {
-                // Upload new logo
-                const file = await storage.createFile(BUCKET_LOGOS, ID.unique(), logoFile);
-                // Get View URL
-                const result = storage.getFileView(BUCKET_LOGOS, file.$id);
-                logoUrl = result.href;
+            if (logo) {
+                if (typeof logo === 'string') {
+                    // Direct URL provided
+                    logoUrl = logo;
+                } else {
+                    // File upload
+                    const file = await storage.createFile(BUCKET_LOGOS, ID.unique(), logo);
+                    // Get View URL
+                    const result = storage.getFileView(BUCKET_LOGOS, file.$id);
+                    logoUrl = result.href;
+                }
             }
 
             await databases.updateDocument(DB_ID, COLL_FANTASY_TEAMS, team.id, {
                 team_name: newName,
-                logo_url: logoUrl
+                fantasylogo_url: logoUrl
             });
 
             // Update local state

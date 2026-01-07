@@ -39,10 +39,26 @@ export const Navbar = () => {
                         </Link>
                     )}
 
-                    <Link to="/players" className="hidden md:flex flex-col items-center text-gray-300 hover:text-white transition cursor-pointer">
-                        <ClipboardList size={20} />
-                        <span className="text-xs mt-1">Listone</span>
-                    </Link>
+                    {/* Listone Dropdown (Desktop) */}
+                    <div className="hidden md:inline-block relative group">
+                        <button className="flex flex-col items-center text-gray-300 hover:text-white transition cursor-pointer focus:outline-none">
+                            <ClipboardList size={20} />
+                            <span className="text-xs mt-1 flex items-center gap-0.5">
+                                Listone <ChevronDown size={10} />
+                            </span>
+                        </button>
+                        {/* Dropdown Content */}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-48 bg-pl-dark border border-white/20 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all transform origin-top p-2 z-50">
+                            <Link to="/players" className="flex items-center gap-2 px-4 py-3 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition text-sm">
+                                <ClipboardList size={16} />
+                                Listone Giocatori
+                            </Link>
+                            <Link to="/teams" className="flex items-center gap-2 px-4 py-3 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition text-sm">
+                                <Users size={16} /> {/* Or other icon */}
+                                Lista Rose
+                            </Link>
+                        </div>
+                    </div>
 
                     <Link to="/fixtures" className="hidden md:flex flex-col items-center text-gray-300 hover:text-white transition cursor-pointer">
                         <Calendar size={20} />
@@ -96,7 +112,7 @@ export const Navbar = () => {
 
             {/* Mobile Dropdown Menu */}
             {mobileMenuOpen && (
-                <div className="md:hidden absolute left-0 right-0 top-16 bg-pl-dark/98 backdrop-blur-lg border-b border-white/20 shadow-xl">
+                <div className="md:hidden absolute left-0 right-0 top-16 bg-pl-dark/98 backdrop-blur-lg border-b border-white/20 shadow-xl z-50">
                     <div className="flex flex-col">
                         {user && (
                             <Link
@@ -114,7 +130,15 @@ export const Navbar = () => {
                             onClick={closeMobileMenu}
                         >
                             <ClipboardList size={20} />
-                            <span>Listone</span>
+                            <span>Listone Giocatori</span>
+                        </Link>
+                        <Link
+                            to="/teams" // Link to Teams List logic on mobile
+                            className="flex items-center gap-3 px-6 py-4 text-gray-300 hover:text-white hover:bg-white/10 transition border-b border-white/10"
+                            onClick={closeMobileMenu}
+                        >
+                            <Users size={20} />
+                            <span>Lista Rose</span>
                         </Link>
                         <Link
                             to="/fixtures"

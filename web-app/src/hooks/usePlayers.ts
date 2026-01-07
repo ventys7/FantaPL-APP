@@ -14,6 +14,8 @@ export interface Player {
     quotation: number;
     purchase_price: number;
     owner: string | null;
+    is_active: boolean;
+    created_at: string;
 }
 
 // Interface for Real Team Metadata
@@ -97,7 +99,11 @@ export function usePlayers(): UsePlayersReturn {
                     image_url: doc.image_url,
                     quotation: doc.quotation || 0,
                     purchase_price: doc.purchase_price || 0,
-                    owner: doc.owner || null
+                    quotation: doc.quotation || 0,
+                    purchase_price: doc.purchase_price || 0,
+                    owner: doc.owner || null,
+                    is_active: doc.is_active !== false, // Default to true if missing
+                    created_at: doc.$createdAt
                 })) as Player[];
 
                 allPlayers = [...allPlayers, ...batch];

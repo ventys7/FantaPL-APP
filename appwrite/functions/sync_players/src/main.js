@@ -134,6 +134,7 @@ async function syncPlayers(db, log) {
     let totalPlayers = 0;
     let syncedPlayers = 0;
     let errors = 0;
+    const activePlayerIds = new Set(); // Track all players found in FotMob
 
     for (const team of teams) {
         log(`Fetching squad for ${team.name}...`);
@@ -153,7 +154,6 @@ async function syncPlayers(db, log) {
                     const docId = `player_${member.id}`;
 
                     const role = mapPosition(member.role?.fallback || group.title);
-                    const shortName = member.name.split(' ').pop(); // Fallback
                     const baseData = {
                         name: member.name,
                         team_id: team.dbId,
@@ -161,8 +161,11 @@ async function syncPlayers(db, log) {
                         position: role,
                         fotmob_id: String(member.id),
                         shirt_number: member.shirtNumber ? parseInt(member.shirtNumber) : null,
-                        image_url: `https://images.fotmob.com/image_resources/playerimages/${member.id}.png`
+                        image_url: `https://images.fotmob.com/image_resources/playerimages/${member.id}.png`,
+                        is_active: true
                     };
+
+                    activePlayerIds.add(docId);
 
                     // Goalkeeper Block Enforcement
                     if (role === 'Portiere' && team.goalkeeper_owner) {
@@ -213,7 +216,47 @@ async function syncPlayers(db, log) {
         await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    return { success: true, action: 'SYNC_PLAYERS', teamsProcessed: teams.length, totalPlayers, syncedPlayers, errors };
+    // ============ SOFT DELETE LOGIC ============
+    log('Starting Soft Delete check...');
+    let deactivated = 0;
+
+    try {
+        // Fetch all players currently marked as active
+        let allDbPlayers = [];
+        let offset = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+            const res = await db.listDocuments(DATABASE_ID, PLAYERS_COLLECTION_ID, [
+                Query.limit(100),
+                Query.offset(offset),
+                Query.equal('is_active', true),
+                Query.select(['$id', 'name'])
+            ]);
+
+            allDbPlayers = [...allDbPlayers, ...res.documents];
+            offset += 100;
+            hasMore = res.documents.length === 100;
+        }
+
+        log(`Checking ${allDbPlayers.length} active players in DB against ${activePlayerIds.size} from API...`);
+
+        for (const p of allDbPlayers) {
+            if (!activePlayerIds.has(p.$id)) {
+                log(`Soft Deleting (Deactivating) player: ${p.name} (${p.$id})`);
+                await db.updateDocument(DATABASE_ID, PLAYERS_COLLECTION_ID, p.$id, {
+                    is_active: false
+                });
+                deactivated++;
+            }
+        }
+
+    } catch (err) {
+        log(`Error during Soft Delete phase: ${err.message}`);
+        errors++;
+    }
+
+    return { success: true, action: 'SYNC_PLAYERS', teamsProcessed: teams.length, totalPlayers, syncedPlayers, deactivated, errors };
 }
 
 // ============ UPDATE PLAYER ============
