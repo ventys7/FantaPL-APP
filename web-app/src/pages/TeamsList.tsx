@@ -114,13 +114,13 @@ export const TeamsList = () => {
                 roleCounts.C === 8 &&
                 roleCounts.A === 6;
 
-            const remaining = 500 - spent;
+            const remaining = team.credits ?? 500;
 
             return {
                 managerName,
                 teamName: team.team_name || `Squadra di ${managerName}`,
                 logoUrl: team.fantasylogo_url, // Fantasy team logo
-                budget: 500, // Fixed start
+                budget: team.budget || 500,
                 spent,
                 remaining,
                 players: squadPlayers, // Raw list, we'll group in render
@@ -132,9 +132,7 @@ export const TeamsList = () => {
             };
         });
 
-        // Sort by Remaining Budget (Descending) or Name?
-        // User didn't specify. Alphabetical usually safest or Complete first.
-        // Let's sort by Manager Name.
+        // Sort alphabetically by Manager Name
         analysis.sort((a, b) => a.managerName.localeCompare(b.managerName));
 
         setTeamsAnalysis(analysis);
@@ -206,7 +204,7 @@ const TeamCard = ({ team, realTeams }: { team: TeamSquad, realTeams: any[] }) =>
                         <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Budget</span>
                         <div className="flex items-center gap-1.5 text-pl-teal font-mono font-bold text-lg">
                             <Coins size={16} />
-                            {team.remaining} <span className="text-xs text-gray-500 font-normal self-end mb-0.5">/ 500</span>
+                            {team.remaining} <span className="text-xs text-gray-500 font-normal self-end mb-0.5">/ {team.budget}</span>
                         </div>
                     </div>
 
@@ -268,19 +266,169 @@ const TeamCard = ({ team, realTeams }: { team: TeamSquad, realTeams: any[] }) =>
     );
 };
 const SquadRoleSection = ({ players, role, label, required, countType = 'player', realTeams = [] }: { players: any[], role: string, label: string, required: number, countType?: 'player' | 'block', realTeams?: any[] }) => {
+    const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
+
+    const toggleBlock = (teamId: string) => {
+        setExpandedBlocks(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(teamId)) newSet.delete(teamId);
+            else newSet.add(teamId);
+            return newSet;
+        });
+    };
+
     // Filter players by role
     const rolePlayers = players.filter(p => p.position === role);
 
+    // For Goalkeepers: Group into blocks by team
+    if (role === 'Portiere') {
+        // Get unique team IDs for GKs owned by this manager
+        const teamIds = [...new Set(rolePlayers.map(p => p.team_id))];
+
+        // Create block data
+        const blocks = teamIds.map(teamId => {
+            const teamData = realTeams.find(t => t.$id === teamId);
+            const teamPlayers = rolePlayers.filter(p => p.team_id === teamId);
+            return {
+                teamId,
+                teamName: teamPlayers[0]?.team_name || 'Team',
+                teamShortName: teamPlayers[0]?.team_short_name || '???',
+                quotation: teamData?.goalkeeper_quotation || 0,
+                purchasePrice: teamData?.goalkeeper_purchase_price || 0,
+                players: teamPlayers
+            };
+        });
+
+        // Sort blocks by purchase price descending
+        blocks.sort((a, b) => b.purchasePrice - a.purchasePrice);
+
+        return (
+            <div className="p-3">
+                <div className="flex items-center justify-between mb-2 px-1">
+                    <span className="text-[10px] uppercase font-bold text-gray-500">{label} (Blocchi)</span>
+                </div>
+
+                {blocks.length === 0 ? (
+                    <div className="px-2 py-1 text-xs text-gray-600 italic">-</div>
+                ) : (
+                    <div className="space-y-1">
+                        {blocks.map(block => (
+                            <div key={block.teamId}>
+                                {/* Block Header - Clickable */}
+                                <div
+                                    onClick={() => toggleBlock(block.teamId)}
+                                    className="flex items-center justify-between px-2 py-2 rounded hover:bg-white/5 transition group cursor-pointer"
+                                >
+                                    {/* Left: Team Logo & Photo Stack */}
+                                    <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
+                                        <div className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center shrink-0" title={block.teamName}>
+                                            <img
+                                                src={`https://images.fotmob.com/image_resources/logo/teamlogo/${block.teamId.replace('team_', '')}.png`}
+                                                alt={block.teamShortName}
+                                                className="w-full h-full object-contain drop-shadow-md"
+                                                loading="lazy"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    target.style.display = 'none';
+                                                    if (target.parentElement) {
+                                                        target.parentElement.innerText = block.teamShortName?.substring(0, 3) || '?';
+                                                        target.parentElement.className = "w-8 h-8 md:w-9 md:h-9 flex items-center justify-center shrink-0 bg-white/10 rounded-md text-[9px] font-bold text-gray-400";
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                        {/* Dynamic Grid for symmetry with player photo */}
+                                        <div className="w-8 h-8 md:w-9 md:h-9 shrink-0 overflow-hidden rounded-full border border-white/20 bg-slate-800 shadow-lg pl-0">
+                                            <div className={`grid w-full h-full p-[1px] gap-[1px] ${block.players.length === 2 ? 'grid-cols-2' :
+                                                block.players.length >= 3 ? 'grid-cols-2 grid-rows-2' :
+                                                    'grid-cols-1'
+                                                }`}>
+                                                {block.players.length === 1 ? (
+                                                    <div className="w-full h-full overflow-hidden">
+                                                        <img src={block.players[0].image_url} alt="" className="w-full h-full object-cover" />
+                                                    </div>
+                                                ) : block.players.length === 2 ? (
+                                                    block.players.map(p => (
+                                                        <div key={p.$id} className="w-full h-full overflow-hidden">
+                                                            <img src={p.image_url} alt="" className="w-full h-full object-cover" />
+                                                        </div>
+                                                    ))
+                                                ) : block.players.length === 3 ? (
+                                                    <>
+                                                        <div className="col-span-2 w-full h-full overflow-hidden">
+                                                            <img src={block.players[0].image_url} alt="" className="w-full h-full object-cover" />
+                                                        </div>
+                                                        <div className="w-full h-full overflow-hidden">
+                                                            <img src={block.players[1].image_url} alt="" className="w-full h-full object-cover" />
+                                                        </div>
+                                                        <div className="w-full h-full overflow-hidden">
+                                                            <img src={block.players[2].image_url} alt="" className="w-full h-full object-cover" />
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    // 4 or more players
+                                                    block.players.slice(0, 4).map((p, idx) => (
+                                                        <div key={p.$id} className="w-full h-full overflow-hidden relative">
+                                                            <img src={p.image_url} alt="" className="w-full h-full object-cover" />
+                                                            {idx === 3 && block.players.length > 4 && (
+                                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] font-bold text-white">
+                                                                    +{block.players.length - 3}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="text-sm md:text-base text-gray-200 truncate group-hover:text-white transition font-medium">
+                                                Blocco {block.teamName}
+                                            </span>
+                                            <ChevronDown size={14} className={`text-gray-500 transition shrink-0 ${expandedBlocks.has(block.teamId) ? 'rotate-180' : ''}`} />
+                                        </div>
+                                    </div>
+
+                                    {/* Right: Quotation, Price */}
+                                    <div className="flex items-center gap-3 shrink-0 ml-2">
+                                        <div className="flex flex-col items-end leading-none">
+                                            <span className="text-[8px] md:text-[10px] text-gray-500 mb-0.5">Q</span>
+                                            <span className="text-xs md:text-base font-bold text-white">{block.quotation}</span>
+                                        </div>
+                                        <div className="flex flex-col items-end leading-none w-8">
+                                            <span className="text-[8px] md:text-[10px] text-gray-500 mb-0.5">P</span>
+                                            <span className="text-xs md:text-base font-bold text-pl-teal">{block.purchasePrice || '-'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Expanded: List of GKs */}
+                                {expandedBlocks.has(block.teamId) && (
+                                    <div className="ml-6 pl-3 border-l border-white/10 space-y-1 py-1">
+                                        {block.players.map(p => (
+                                            <div key={p.$id} className="flex items-center gap-2 py-1 text-xs text-gray-400">
+                                                <div className="w-6 h-6 rounded-full bg-white/10 overflow-hidden border border-white/20 shrink-0">
+                                                    {p.image_url ? (
+                                                        <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-500">?</div>
+                                                    )}
+                                                </div>
+                                                <span className="truncate">{p.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // Non-GK players: Standard list
     // Sort by Price Desc
     rolePlayers.sort((a, b) => (b.purchase_price || 0) - (a.purchase_price || 0));
-
-    // Special Handling for GKs (Show Blocks)
-    // If Portiere, we prefer to show "Blocco Inter" instead of individual if user wants "2 blocchi".
-    // But user also said "affianco ad ogni giocatore presente metti quotazione e prezzo acquisto"
-    // So showing PLAYERS is safer, but maybe grouping them?
-    // Let's just list players, but maybe add visual separator for teams if GK?
-    // User requirement: "2 blocchi portiere... affianco ad ogni giocatore... quotazione e prezzo".
-    // So list PLAYERS.
 
     return (
         <div className="p-3">
@@ -297,13 +445,9 @@ const SquadRoleSection = ({ players, role, label, required, countType = 'player'
                 <div className="space-y-1">
                     {rolePlayers.map(p => (
                         <div key={p.$id} className="flex items-center justify-between px-2 py-2 rounded hover:bg-white/5 transition group">
-                            {/* Left: Team, Face, Name */}
-                            <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
-                                {/* Team Badge - Fixed width & height for perfect alignment and centering */}
-                                {/* Team Logo - Replaces Short Name */}
-                                {/* Team Logo - Transparent & Larger for better quality */}
-                                {/* Team Logo - Responsive & Better Quality */}
-                                <div className="w-9 h-9 md:w-12 md:h-12 flex items-center justify-center shrink-0" title={p.team_name}>
+                            {/* Left: Team Logo, Player Photo, Name */}
+                            <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
+                                <div className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center shrink-0" title={p.team_name}>
                                     <img
                                         src={`https://images.fotmob.com/image_resources/logo/teamlogo/${p.team_id.replace('team_', '')}.png`}
                                         alt={p.team_short_name}
@@ -314,21 +458,19 @@ const SquadRoleSection = ({ players, role, label, required, countType = 'player'
                                             target.style.display = 'none';
                                             if (target.parentElement) {
                                                 target.parentElement.innerText = p.team_short_name?.substring(0, 3) || '?';
-                                                target.parentElement.className = "w-9 h-9 md:w-12 md:h-12 flex items-center justify-center shrink-0 bg-white/10 rounded-md text-[10px] md:text-xs font-bold text-gray-400";
+                                                target.parentElement.className = "w-8 h-8 md:w-9 md:h-9 flex items-center justify-center shrink-0 bg-white/10 rounded-md text-[9px] font-bold text-gray-400";
                                             }
                                         }}
                                     />
                                 </div>
-
-                                {/* Player Image - Scaled to match Logo */}
-                                <div className="w-9 h-9 md:w-12 md:h-12 rounded-full bg-white/10 overflow-hidden shrink-0 border border-white/20">
+                                {/* Player Photo wrapper - Match the padding/alignment of GK grid */}
+                                <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-slate-800 border border-white/20 overflow-hidden shrink-0 shadow-lg">
                                     {p.image_url ? (
                                         <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
                                     ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-[9px] md:text-xs text-gray-500">?</div>
+                                        <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-500">?</div>
                                     )}
                                 </div>
-
                                 <span className="text-sm md:text-base text-gray-200 truncate group-hover:text-white transition font-medium">{p.name}</span>
                             </div>
 
@@ -336,18 +478,14 @@ const SquadRoleSection = ({ players, role, label, required, countType = 'player'
                             <div className="flex items-center gap-3 shrink-0 ml-2">
                                 <div className="flex flex-col items-end leading-none">
                                     <span className="text-[8px] md:text-[10px] text-gray-500 mb-0.5">Q</span>
-                                    <span className="text-xs md:text-base font-medium text-white">
-                                        {role === 'Portiere'
-                                            ? (realTeams.find(t => t.$id === p.team_id)?.goalkeeper_quotation ?? p.quotation)
-                                            : p.quotation}
+                                    <span className="text-xs md:text-base font-bold text-white">
+                                        {p.quotation}
                                     </span>
                                 </div>
                                 <div className="flex flex-col items-end leading-none w-8">
-                                    <span className="text-[8px] md:text-[10px] text-gray-500 mb-0.5">Price</span>
+                                    <span className="text-[8px] md:text-[10px] text-gray-500 mb-0.5">P</span>
                                     <span className="text-xs md:text-base font-bold text-pl-teal">
-                                        {role === 'Portiere'
-                                            ? (realTeams.find(t => t.$id === p.team_id)?.goalkeeper_purchase_price ?? p.purchase_price ?? '-')
-                                            : (p.purchase_price || '-')}
+                                        {p.purchase_price || '-'}
                                     </span>
                                 </div>
                             </div>
