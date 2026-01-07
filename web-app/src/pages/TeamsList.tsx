@@ -386,7 +386,7 @@ const SquadRoleSection = ({ players, role, label, required, countType = 'player'
                                         </div>
                                         <div className="flex items-center gap-2 min-w-0">
                                             <span className="text-sm md:text-base text-gray-200 truncate group-hover:text-white transition font-medium">
-                                                Blocco {block.teamName}
+                                                Blocco {block.teamShortName}
                                             </span>
                                             <ChevronDown size={14} className={`text-gray-500 transition shrink-0 ${expandedBlocks.has(block.teamId) ? 'rotate-180' : ''}`} />
                                         </div>
