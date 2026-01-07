@@ -350,26 +350,20 @@ const SquadRoleSection = ({ players, role, label, required, countType = 'player'
                                                 ) : block.players.length === 2 ? (
                                                     block.players.map(p => (
                                                         <div key={p.$id} className="w-full h-full overflow-hidden">
-                                                            <img src={p.image_url} alt="" className="w-full h-full object-cover" />
+                                                            <img src={p.image_url} alt="" className="w-full h-full object-cover scale-[1.1]" />
                                                         </div>
                                                     ))
                                                 ) : block.players.length === 3 ? (
-                                                    <>
-                                                        <div className="col-span-2 w-full h-full overflow-hidden">
-                                                            <img src={block.players[0].image_url} alt="" className="w-full h-full object-cover" />
+                                                    block.players.map(p => (
+                                                        <div key={p.$id} className="w-full h-full overflow-hidden">
+                                                            <img src={p.image_url} alt="" className="w-full h-full object-cover scale-[1.2]" />
                                                         </div>
-                                                        <div className="w-full h-full overflow-hidden">
-                                                            <img src={block.players[1].image_url} alt="" className="w-full h-full object-cover" />
-                                                        </div>
-                                                        <div className="w-full h-full overflow-hidden">
-                                                            <img src={block.players[2].image_url} alt="" className="w-full h-full object-cover" />
-                                                        </div>
-                                                    </>
+                                                    ))
                                                 ) : (
                                                     // 4 or more players
                                                     block.players.slice(0, 4).map((p, idx) => (
                                                         <div key={p.$id} className="w-full h-full overflow-hidden relative">
-                                                            <img src={p.image_url} alt="" className="w-full h-full object-cover" />
+                                                            <img src={p.image_url} alt="" className="w-full h-full object-cover scale-[1.2]" />
                                                             {idx === 3 && block.players.length > 4 && (
                                                                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] font-bold text-white">
                                                                     +{block.players.length - 3}
