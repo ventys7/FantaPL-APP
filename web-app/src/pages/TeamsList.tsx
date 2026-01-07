@@ -132,8 +132,18 @@ export const TeamsList = () => {
             };
         });
 
-        // Sort alphabetically by Manager Name
-        analysis.sort((a, b) => a.managerName.localeCompare(b.managerName));
+        // Custom sorting: Compound names (containing '-') go last.
+        // Within each group, sort alphabetically.
+        analysis.sort((a, b) => {
+            const aHasHyphen = a.managerName.includes('-');
+            const bHasHyphen = b.managerName.includes('-');
+
+            if (aHasHyphen && !bHasHyphen) return 1;
+            if (!aHasHyphen && bHasHyphen) return -1;
+
+            // Both are same category, sort alphabetically
+            return a.managerName.localeCompare(b.managerName);
+        });
 
         setTeamsAnalysis(analysis);
 
