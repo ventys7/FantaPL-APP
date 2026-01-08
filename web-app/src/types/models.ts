@@ -1,7 +1,8 @@
 import { AppwriteDocument } from './shared';
+import { Player, RealTeam, PlayerPosition } from './player';
 
-// Re-export Player from unified source
-export type { Player, RealTeam, PlayerPosition } from './player';
+// Re-export Player types for backward compatibility
+export type { Player, RealTeam, PlayerPosition };
 
 export interface Team extends AppwriteDocument {
     name: string;
