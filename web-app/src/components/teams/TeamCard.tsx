@@ -100,7 +100,7 @@ export const TeamCard = ({ team, realTeams }: TeamCardProps) => {
             <div className="max-h-[480px] overflow-y-auto divide-y divide-white/5 bg-black/10 transition-all">
                 {/* Conditionally Render Sections based on activeFilter */}
                 {(activeFilter === 'ALL' || activeFilter === 'P') && (
-                    <SquadRoleSection players={team.players} role="Portiere" label="Portieri" required={2} countType="block" realTeams={realTeams} />
+                    <SquadRoleSection players={team.players} role="Portiere" label="Portieri" required={2} countType="block" realTeams={realTeams} managerName={team.managerName} />
                 )}
                 {(activeFilter === 'ALL' || activeFilter === 'D') && (
                     <SquadRoleSection players={team.players} role="Difensore" label="Difensori" required={8} realTeams={realTeams} />

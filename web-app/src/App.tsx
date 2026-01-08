@@ -21,6 +21,8 @@ const ParticipantManagement = lazy(() => import('./pages/ParticipantManagement')
 const AdminSystem = lazy(() => import('./pages/AdminSystem').then(module => ({ default: module.AdminSystem })));
 const AdminPlayers = lazy(() => import('./pages/AdminPlayers').then(module => ({ default: module.AdminPlayers })));
 const TeamsList = lazy(() => import('./pages/TeamsList').then(module => ({ default: module.TeamsList })));
+const TradeMarket = lazy(() => import('./pages/TradeMarket').then(module => ({ default: module.TradeMarket })));
+const AdminTrades = lazy(() => import('./pages/AdminTrades').then(module => ({ default: module.AdminTrades })));
 
 
 function AdminIndex() {
@@ -87,6 +89,7 @@ function App() {
                                 <Route path="/fixtures" element={<Fixtures />} />
                                 <Route path="/players" element={<Players />} />
                                 <Route path="/teams" element={<ProtectedRoute><TeamsList /></ProtectedRoute>} /> {/* New Route */}
+                                <Route path="/trades" element={<ProtectedRoute><TradeMarket /></ProtectedRoute>} />
                                 <Route path="/rules" element={<Rules />} />
                                 <Route path="/login" element={<Login />} />
                                 <Route path="/change-password" element={
@@ -116,6 +119,11 @@ function App() {
                                     <Route path="system" element={
                                         <ProtectedRoute requiredRole="g_admin">
                                             <AdminSystem />
+                                        </ProtectedRoute>
+                                    } />
+                                    <Route path="trades" element={
+                                        <ProtectedRoute requiredRole="admin">
+                                            <AdminTrades />
                                         </ProtectedRoute>
                                     } />
 

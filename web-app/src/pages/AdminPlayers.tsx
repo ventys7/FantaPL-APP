@@ -785,13 +785,14 @@ export const AdminPlayers = () => {
                                                             <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Quot. Totale</label>
                                                             <input
                                                                 type="number"
-                                                                value={team.goalkeeper_quotation || 0}
+                                                                value={team.goalkeeper_quotation || ''}
                                                                 onChange={(e) => {
-                                                                    const val = parseInt(e.target.value);
+                                                                    const val = e.target.value === '' ? 0 : parseInt(e.target.value) || 0;
                                                                     setRealTeams(prev => prev.map(t => t.$id === team.$id ? { ...t, goalkeeper_quotation: val } : t));
                                                                 }}
-                                                                onBlur={(e) => saveBlockOwner(team.$id, team.goalkeeper_owner, parseInt(e.target.value), team.goalkeeper_purchase_price || 0)}
+                                                                onBlur={(e) => saveBlockOwner(team.$id, team.goalkeeper_owner, parseInt(e.target.value) || 0, team.goalkeeper_purchase_price || 0)}
                                                                 onClick={e => e.stopPropagation()}
+                                                                placeholder="0"
                                                                 className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:border-pl-teal outline-none font-mono text-center"
                                                             />
                                                         </div>
@@ -801,13 +802,14 @@ export const AdminPlayers = () => {
                                                             <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Prezzo Asta</label>
                                                             <input
                                                                 type="number"
-                                                                value={team.goalkeeper_purchase_price || 0}
+                                                                value={team.goalkeeper_purchase_price || ''}
                                                                 onChange={(e) => {
-                                                                    const val = parseInt(e.target.value);
+                                                                    const val = e.target.value === '' ? 0 : parseInt(e.target.value) || 0;
                                                                     setRealTeams(prev => prev.map(t => t.$id === team.$id ? { ...t, goalkeeper_purchase_price: val } : t));
                                                                 }}
-                                                                onBlur={(e) => saveBlockOwner(team.$id, team.goalkeeper_owner, team.goalkeeper_quotation || 0, parseInt(e.target.value))}
+                                                                onBlur={(e) => saveBlockOwner(team.$id, team.goalkeeper_owner, team.goalkeeper_quotation || 0, parseInt(e.target.value) || 0)}
                                                                 onClick={e => e.stopPropagation()}
+                                                                placeholder="0"
                                                                 className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-pl-teal font-bold focus:border-pl-teal outline-none font-mono text-center"
                                                             />
                                                         </div>

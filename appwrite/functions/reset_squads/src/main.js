@@ -5,6 +5,7 @@ const API_KEY = process.env.APPWRITE_API_KEY;
 const DATABASE_ID = process.env.DB_ID || 'fantapl_db';
 const PLAYERS_COLLECTION_ID = process.env.COLL_PLAYERS || 'players';
 const TEAMS_COLLECTION_ID = process.env.COLL_TEAMS || 'real_teams';
+const TRADE_PROPOSALS_COLLECTION_ID = process.env.COLL_TRADE_PROPOSALS || 'trade_proposals';
 
 export default async ({ req, res, log, error }) => {
     log('=== reset_squads v1 ===');
@@ -67,12 +68,32 @@ export default async ({ req, res, log, error }) => {
         }
 
         log(`Total GK blocks reset: ${totalTeamsReset}`);
+
+        // 3. Delete all trade proposals
+        log('Deleting trade proposals...');
+        let tradesDeleted = 0;
+        let tradesHasMore = true;
+        while (tradesHasMore) {
+            const tradesRes = await db.listDocuments(DATABASE_ID, TRADE_PROPOSALS_COLLECTION_ID, [
+                Query.limit(100)
+            ]);
+
+            for (const doc of tradesRes.documents) {
+                await db.deleteDocument(DATABASE_ID, TRADE_PROPOSALS_COLLECTION_ID, doc.$id);
+                tradesDeleted++;
+            }
+
+            tradesHasMore = tradesRes.documents.length === 100;
+        }
+        log(`Total trade proposals deleted: ${tradesDeleted}`);
+
         log('Squad reset completed successfully!');
 
         return res.json({
             success: true,
             playersReset: totalPlayersReset,
-            teamsReset: totalTeamsReset
+            teamsReset: totalTeamsReset,
+            tradesDeleted: tradesDeleted
         });
 
     } catch (err) {

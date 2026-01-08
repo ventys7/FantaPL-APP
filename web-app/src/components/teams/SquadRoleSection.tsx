@@ -8,6 +8,7 @@ interface SquadRoleSectionProps {
     required: number;
     countType?: 'player' | 'block';
     realTeams?: any[];
+    managerName?: string; // Manager name to filter GK blocks
 }
 
 export const SquadRoleSection = ({
@@ -16,7 +17,8 @@ export const SquadRoleSection = ({
     label,
     required,
     countType = 'player',
-    realTeams = []
+    realTeams = [],
+    managerName = ''
 }: SquadRoleSectionProps) => {
     const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
 
@@ -34,13 +36,21 @@ export const SquadRoleSection = ({
 
     // For Goalkeepers: Group into blocks by team
     if (role === 'Portiere') {
-        // Get unique team IDs for GKs owned by this manager
-        const teamIds = [...new Set(rolePlayers.map(p => p.team_id))];
+        // Only show blocks where goalkeeper_owner matches this manager
+        const ownedTeamIds = new Set(
+            realTeams.filter(t => t.goalkeeper_owner === managerName).map(t => t.$id)
+        );
+
+        // Get all GKs that belong to owned blocks
+        const allGks = players.filter(p => p.position === 'Portiere' && ownedTeamIds.has(p.team_id));
+
+        // Get unique team IDs for GKs in owned blocks
+        const teamIds = [...new Set(allGks.map(p => p.team_id))];
 
         // Create block data
         const blocks = teamIds.map(teamId => {
             const teamData = realTeams.find(t => t.$id === teamId);
-            const teamPlayers = rolePlayers.filter(p => p.team_id === teamId);
+            const teamPlayers = allGks.filter(p => p.team_id === teamId);
             return {
                 teamId,
                 teamName: teamPlayers[0]?.team_name || 'Team',

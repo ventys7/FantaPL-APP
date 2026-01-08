@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trophy, Calendar, Users, Shield, FileText, LogIn, LogOut, ChevronDown, Menu, X, ClipboardList, Shirt, Settings } from 'lucide-react';
+import { Trophy, Calendar, Users, Shield, FileText, LogIn, LogOut, ChevronDown, Menu, X, ClipboardList, Shirt, Settings, ArrowLeftRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const Navbar = () => {
@@ -59,6 +59,14 @@ export const Navbar = () => {
                             </Link>
                         </div>
                     </div>
+
+                    {/* Mercato Scambi (Desktop) */}
+                    {user && (
+                        <Link to="/trades" className="hidden md:flex flex-col items-center text-gray-300 hover:text-white transition cursor-pointer">
+                            <ArrowLeftRight size={20} />
+                            <span className="text-xs mt-1">Scambi</span>
+                        </Link>
+                    )}
 
                     <Link to="/fixtures" className="hidden md:flex flex-col items-center text-gray-300 hover:text-white transition cursor-pointer">
                         <Calendar size={20} />
@@ -140,6 +148,17 @@ export const Navbar = () => {
                             <Users size={20} />
                             <span>Lista Rose</span>
                         </Link>
+                        {/* Mercato Scambi - Mobile */}
+                        {user && (
+                            <Link
+                                to="/trades"
+                                className="flex items-center gap-3 px-6 py-4 text-gray-300 hover:text-white hover:bg-white/10 transition border-b border-white/10"
+                                onClick={closeMobileMenu}
+                            >
+                                <ArrowLeftRight size={20} />
+                                <span>Mercato Scambi</span>
+                            </Link>
+                        )}
                         <Link
                             to="/fixtures"
                             className="flex items-center gap-3 px-6 py-4 text-gray-300 hover:text-white hover:bg-white/10 transition border-b border-white/10"

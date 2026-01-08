@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { Users, FileText, ChevronLeft, RefreshCw, ClipboardList } from 'lucide-react';
+import { Users, FileText, ChevronLeft, RefreshCw, ClipboardList, ArrowLeftRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export function AdminLayout() {
@@ -43,6 +43,15 @@ export function AdminLayout() {
                         <FileText size={20} className="md:w-5 md:h-5 w-6 h-6" />
                         <span className="text-[10px] md:text-base font-bold md:font-normal">Voti</span>
                     </NavLink>
+                    {hasRole('admin') && (
+                        <NavLink
+                            to="/admin/trades"
+                            className={({ isActive }) => `flex-1 md:flex-none flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 px-2 md:px-4 py-2 md:py-3 rounded-lg transition whitespace-nowrap ${isActive ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                        >
+                            <ArrowLeftRight size={20} className="md:w-5 md:h-5 w-6 h-6" />
+                            <span className="text-[10px] md:text-base font-bold md:font-normal">Scambi</span>
+                        </NavLink>
+                    )}
                     {hasRole('g_admin') && (
                         <NavLink
                             to="/admin/system"
