@@ -13,7 +13,7 @@ const FOTMOB_IMG_URL = 'https://images.fotmob.com/image_resources/playerimages';
 
 const getClient = () => {
     const client = new Client()
-        .setEndpoint('https://fra.cloud.appwrite.io/v1')
+        .setEndpoint(process.env.APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1')
         .setProject(PROJECT_ID)
         .setKey(API_KEY);
     return new Databases(client);

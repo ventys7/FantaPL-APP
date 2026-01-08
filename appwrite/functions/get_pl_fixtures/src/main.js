@@ -31,7 +31,7 @@ const SHORT_NAMES = {
 // Appwrite Client Helper
 const getDb = () => {
     const client = new Client()
-        .setEndpoint('https://fra.cloud.appwrite.io/v1')
+        .setEndpoint(process.env.APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1')
         .setProject(PROJECT_ID)
         .setKey(API_KEY);
     return new Databases(client);
