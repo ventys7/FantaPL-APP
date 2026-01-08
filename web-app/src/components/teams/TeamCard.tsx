@@ -97,7 +97,7 @@ export const TeamCard = ({ team, realTeams }: TeamCardProps) => {
             </div>
 
             {/* Detailed Roster */}
-            <div className="max-h-[400px] overflow-y-auto divide-y divide-white/5 bg-black/10 transition-all">
+            <div className="max-h-[480px] overflow-y-auto divide-y divide-white/5 bg-black/10 transition-all">
                 {/* Conditionally Render Sections based on activeFilter */}
                 {(activeFilter === 'ALL' || activeFilter === 'P') && (
                     <SquadRoleSection players={team.players} role="Portiere" label="Portieri" required={2} countType="block" realTeams={realTeams} />

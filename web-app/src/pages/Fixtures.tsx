@@ -2,11 +2,13 @@ import { useState, useMemo, useEffect } from 'react';
 import { Calendar, Filter, Clock, ChevronRight, RefreshCw, Shield } from 'lucide-react'; // Shield imported from lucide
 import { MatchSheet } from '../components/MatchSheet';
 import { useFixtures, Fixture } from '../hooks/useFixtures';
+import { usePlayers } from '../hooks/usePlayers';
 import { FixtureCard } from '../components/fixtures/FixtureCard';
 import { PremierLeagueHeader } from '../components/fixtures/PremierLeagueHeader';
 
 export function Fixtures() {
     const { fixtures, loading, refreshing, lastUpdate, activeGameweek } = useFixtures();
+    const { realTeams } = usePlayers(); // Get real_teams with correct short_name
 
     const [selectedGameweek, setSelectedGameweek] = useState<number>(1);
     const [showLiveOnly, setShowLiveOnly] = useState(false);
@@ -36,24 +38,37 @@ export function Fixtures() {
 
     const hasLiveMatches = useMemo(() => fixtures.some(f => f.status === 'IN_PLAY'), [fixtures]);
 
+    // Build teams map using database short_name when available
     const teamsMap = useMemo(() => {
         const map = new Map();
+
+        // First, create a lookup from fotmob team ID to database short_name
+        const dbShortNames = new Map<string, string>();
+        realTeams.forEach(t => {
+            // t.$id is like "team_8650", extract just the ID
+            dbShortNames.set(t.$id, t.short_name);
+        });
+
         fixtures.forEach(f => {
-            map.set(`team_${f.home.id}`, {
-                $id: `team_${f.home.id}`,
+            const homeDbKey = `team_${f.home.id}`;
+            const awayDbKey = `team_${f.away.id}`;
+
+            map.set(homeDbKey, {
+                $id: homeDbKey,
                 name: f.home.name,
-                short_name: f.home.shortName,
+                // Prefer database short_name, fallback to FotMob shortName
+                short_name: dbShortNames.get(homeDbKey) || f.home.shortName,
                 logo_url: f.home.logo
             });
-            map.set(`team_${f.away.id}`, {
-                $id: `team_${f.away.id}`,
+            map.set(awayDbKey, {
+                $id: awayDbKey,
                 name: f.away.name,
-                short_name: f.away.shortName,
+                short_name: dbShortNames.get(awayDbKey) || f.away.shortName,
                 logo_url: f.away.logo
             });
         });
         return map;
-    }, [fixtures]);
+    }, [fixtures, realTeams]);
 
     // Convert for MatchSheet
     const convertForMatchSheet = (match: Fixture) => ({

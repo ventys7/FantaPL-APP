@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trophy, Calendar, Users, Shield, FileText, LogIn, LogOut, ChevronDown, Menu, X, ClipboardList, Shirt } from 'lucide-react';
+import { Trophy, Calendar, Users, Shield, FileText, LogIn, LogOut, ChevronDown, Menu, X, ClipboardList, Shirt, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const Navbar = () => {
@@ -84,7 +84,7 @@ export const Navbar = () => {
                             to="/admin"
                             className="flex items-center gap-1 px-3 py-2 rounded-lg bg-pl-pink/20 hover:bg-pl-pink/30 transition text-white"
                         >
-                            <Shield size={18} />
+                            <Settings size={18} />
                             <span className="text-sm hidden md:inline">Admin Panel</span>
                         </Link>
                     )}

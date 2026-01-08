@@ -3,9 +3,10 @@ import { usePlayers, Player } from '../hooks/usePlayers';
 import { useAuth } from '../context/AuthContext';
 import { databases, functions, COLL_FANTASY_TEAMS, COLL_PLAYERS, DB_ID } from '../lib/appwrite';
 import { logger } from '../lib/logger';
+import { matchesSearch } from '../lib/textUtils';
 import { Query } from 'appwrite';
 import { createPortal } from 'react-dom';
-import { Search, ChevronDown, ChevronUp, Save, X, Filter, Loader2, Check, Pen, ClipboardList, Shield, Trash2, Sparkles } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, Save, X, Filter, Loader2, Check, Pen, ClipboardList, Shield, Trash2, Sparkles, UserX } from 'lucide-react';
 import { ROLES, ROLE_ORDER } from '../constants/players';
 
 const COLL_TEAMS = 'real_teams';
@@ -50,6 +51,7 @@ export const AdminPlayers = () => {
     const [roleFilter, setRoleFilter] = useState('Tutti');
     const [ownerFilter, setOwnerFilter] = useState('Tutti');
     const [showNewOnly, setShowNewOnly] = useState(false); // New Filter for "New Players"
+    const [showInactiveOnly, setShowInactiveOnly] = useState(false); // New Inactive Filter
 
     // Loading state for updates
     const [saving, setSaving] = useState(false);
@@ -230,10 +232,9 @@ export const AdminPlayers = () => {
         // NEW: Hide Goalkeepers from Admin List (Managed via Blocks)
         result = result.filter(p => p.position !== 'Portiere');
 
-        // Text Search
+        // Text Search (player name only, accent-insensitive)
         if (searchQuery) {
-            const lowQuery = searchQuery.toLowerCase();
-            result = result.filter(p => p.name.toLowerCase().includes(lowQuery) || p.team_short_name.toLowerCase().includes(lowQuery));
+            result = result.filter(p => matchesSearch(p.name, searchQuery));
         }
 
         // Dropdown Filters
@@ -249,6 +250,11 @@ export const AdminPlayers = () => {
             } else {
                 result = result.filter(p => p.owner === ownerFilter);
             }
+        }
+
+        // Inactive Filter: Show ONLY inactive players
+        if (showInactiveOnly) {
+            result = result.filter(p => !p.is_active);
         }
 
         // "New" Filter: Show ONLY players from the last sync (detected by proximity to the latest created_at)
@@ -276,7 +282,7 @@ export const AdminPlayers = () => {
 
             return a.name.localeCompare(b.name);
         });
-    }, [localPlayers, searchQuery, teamFilter, roleFilter, ownerFilter, showNewOnly]);
+    }, [localPlayers, searchQuery, teamFilter, roleFilter, ownerFilter, showNewOnly, showInactiveOnly]);
 
 
     if (loading && localPlayers.length === 0) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-pl-teal" /></div>;
@@ -316,7 +322,7 @@ export const AdminPlayers = () => {
                 </div>
 
                 {/* Search & Filters */}
-                <div className="flex flex-col md:flex-row gap-2 mt-4 w-full max-w-2xl justify-center">
+                <div className="flex flex-col md:flex-row flex-wrap gap-2 mt-4 w-full justify-center">
                     <div className="relative group w-full md:w-auto">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-hover:text-pl-teal transition-colors w-4 h-4" />
                         <input
@@ -330,7 +336,7 @@ export const AdminPlayers = () => {
 
                     <button
                         onClick={() => setShowNewOnly(!showNewOnly)}
-                        className={`h-[42px] px-4 rounded-xl border flex items-center gap-2 text-sm font-bold transition whitespace-nowrap w-full md:w-auto ${showNewOnly
+                        className={`h-[42px] px-4 rounded-xl border flex items-center justify-start gap-2 text-sm font-bold transition whitespace-nowrap w-full md:w-fit ${showNewOnly
                             ? 'bg-pl-teal text-pl-dark border-pl-teal'
                             : 'bg-black/30 border-white/10 text-gray-300 hover:bg-black/40'
                             }`}
@@ -339,18 +345,30 @@ export const AdminPlayers = () => {
                         {showNewOnly ? 'Nuovi' : 'Nuovi'}
                     </button>
 
+                    <button
+                        onClick={() => setShowInactiveOnly(!showInactiveOnly)}
+                        className={`h-[42px] px-4 rounded-xl border flex items-center justify-start gap-2 text-sm font-bold transition whitespace-nowrap w-full md:w-fit ${showInactiveOnly
+                            ? 'bg-red-500 text-white border-red-500'
+                            : 'bg-black/30 border-white/10 text-gray-300 hover:bg-black/40'
+                            }`}
+                        title="Mostra solo inattivi"
+                    >
+                        <UserX size={16} />
+                        Inattivi
+                    </button>
+
                     <select
                         value={roleFilter}
                         onChange={e => setRoleFilter(e.target.value)}
-                        className="h-[42px] bg-black/30 border border-white/10 rounded-xl px-4 text-sm text-gray-300 outline-none hover:bg-black/40 transition cursor-pointer w-full md:w-auto"
+                        className="h-[42px] bg-black/30 border border-white/10 rounded-xl px-4 text-sm text-gray-300 outline-none hover:bg-black/40 transition cursor-pointer w-full md:w-fit text-left"
                     >
                         <option value="Tutti">Tutti i Ruoli</option>
-                        {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                        {ROLES.filter(r => r !== 'Portiere').map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                     <select
                         value={teamFilter}
                         onChange={e => setTeamFilter(e.target.value)}
-                        className="h-[42px] bg-black/30 border border-white/10 rounded-xl px-4 text-sm text-gray-300 outline-none hover:bg-black/40 transition cursor-pointer w-full md:w-auto"
+                        className="h-[42px] bg-black/30 border border-white/10 rounded-xl px-4 text-sm text-gray-300 outline-none hover:bg-black/40 transition cursor-pointer w-full md:w-fit text-left"
                     >
                         <option value="Tutti">Tutte le Squadre</option>
                         {teams.map(t => <option key={t} value={t}>{t}</option>)}
@@ -359,7 +377,7 @@ export const AdminPlayers = () => {
                     <select
                         value={ownerFilter}
                         onChange={e => setOwnerFilter(e.target.value)}
-                        className="h-[42px] bg-black/30 border border-white/10 rounded-xl px-4 text-sm text-gray-300 outline-none hover:bg-black/40 transition cursor-pointer w-full md:w-auto"
+                        className="h-[42px] bg-black/30 border border-white/10 rounded-xl px-4 text-sm text-gray-300 outline-none hover:bg-black/40 transition cursor-pointer w-full md:w-fit text-left"
                     >
                         <option value="Tutti">Tutti i Proprietari</option>
                         <option value="Svincolati">Svincolati</option>
@@ -367,6 +385,24 @@ export const AdminPlayers = () => {
                             <option key={m.id} value={m.name}>{m.name}</option>
                         ))}
                     </select>
+
+                    {/* Reset Filters X */}
+                    {(searchQuery || showNewOnly || showInactiveOnly || roleFilter !== 'Tutti' || teamFilter !== 'Tutti' || ownerFilter !== 'Tutti') && (
+                        <button
+                            onClick={() => {
+                                setSearchQuery('');
+                                setShowNewOnly(false);
+                                setShowInactiveOnly(false);
+                                setRoleFilter('Tutti');
+                                setTeamFilter('Tutti');
+                                setOwnerFilter('Tutti');
+                            }}
+                            className="h-[42px] w-[42px] rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center transition"
+                            title="Resetta Filtri"
+                        >
+                            <X size={20} />
+                        </button>
+                    )}
                 </div>
 
                 {/* Desktop Table Container */}
