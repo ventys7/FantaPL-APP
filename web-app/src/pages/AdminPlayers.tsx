@@ -2,14 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { usePlayers, Player } from '../hooks/usePlayers';
 import { useAuth } from '../context/AuthContext';
 import { databases, functions, COLL_FANTASY_TEAMS, COLL_PLAYERS, DB_ID } from '../lib/appwrite';
+import { logger } from '../lib/logger';
 import { Query } from 'appwrite';
 import { createPortal } from 'react-dom';
 import { Search, ChevronDown, ChevronUp, Save, X, Filter, Loader2, Check, Pen, ClipboardList, Shield, Trash2, Sparkles } from 'lucide-react';
+import { ROLES, ROLE_ORDER } from '../constants/players';
 
 const COLL_TEAMS = 'real_teams';
 
-const ROLES = ['Portiere', 'Difensore', 'Centrocampista', 'Attaccante'];
-const ROLE_ORDER: Record<string, number> = { 'Portiere': 1, 'Difensore': 2, 'Centrocampista': 3, 'Attaccante': 4 };
 
 
 

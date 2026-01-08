@@ -2,35 +2,14 @@ import { useState, useMemo } from 'react';
 import { Search, Users, ChevronDown, ChevronUp, Loader2, Shield, Sparkles, UserX } from 'lucide-react';
 import { usePlayers, Player } from '../hooks/usePlayers';
 import { useAuth } from '../context/AuthContext';
+import { ROLES_WITH_ALL, ROLE_COLORS, ROLE_ABBR, ROLE_ORDER } from '../constants/players';
 
 type SortKey = 'position' | 'quotation' | 'purchase_price' | null;
 type SortDirection = 'asc' | 'desc';
 
-const ROLES = ['Tutti', 'Portiere', 'Difensore', 'Centrocampista', 'Attaccante'];
-const ROLE_COLORS: Record<string, string> = {
-    'Portiere': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    'Difensore': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    'Centrocampista': 'bg-green-500/20 text-green-400 border-green-500/30',
-    'Attaccante': 'bg-red-500/20 text-red-400 border-red-500/30',
-    'Unknown': 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-};
+// Use shared constants
+const ROLES = ROLES_WITH_ALL;
 
-const ROLE_ABBREV: Record<string, string> = {
-    'Portiere': 'P',
-    'Difensore': 'D',
-    'Centrocampista': 'C',
-    'Attaccante': 'A',
-    'Unknown': '?',
-};
-
-// Role order for sorting: P < D < C < A
-const ROLE_ORDER: Record<string, number> = {
-    'Portiere': 1,
-    'Difensore': 2,
-    'Centrocampista': 3,
-    'Attaccante': 4,
-    'Unknown': 5,
-};
 
 export const Players = () => {
     const { players: rawPlayers, loading, error, refresh, teams, owners, realTeams } = usePlayers();
@@ -568,7 +547,7 @@ export const Players = () => {
                                         {/* Role Badge */}
                                         <div className="col-span-2 flex items-center">
                                             <span className={`px-3 py-1 rounded-full text-xs font-medium border ${ROLE_COLORS[item.position] || ROLE_COLORS['Unknown']}`}>
-                                                {ROLE_ABBREV[item.position] || '?'}
+                                                {ROLE_ABBR[item.position] || '?'}
                                             </span>
                                         </div>
 
@@ -708,7 +687,7 @@ export const Players = () => {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${ROLE_COLORS[item.position] || ROLE_COLORS['Unknown']}`}>
-                                                    {ROLE_ABBREV[item.position] || '?'}
+                                                    {ROLE_ABBR[item.position] || '?'}
                                                 </span>
                                                 <span className={`font-semibold truncate ${item.is_active ? 'text-white' : 'text-gray-500 italic decoration-slate-600'}`}>
                                                     {item.name} {!item.is_active && '*'}

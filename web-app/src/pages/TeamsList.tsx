@@ -1,507 +1,177 @@
 import { useState, useEffect, useMemo } from 'react';
 import { usePlayers } from '../hooks/usePlayers';
 import { useAuth } from '../context/AuthContext';
-import { databases, DB_ID, COLL_FANTASY_TEAMS } from '../lib/appwrite'; // Import DB constants
-import { Loader2, Users, Shield, Coins, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { databases, DB_ID, COLL_FANTASY_TEAMS } from '../lib/appwrite';
+import { logger } from '../lib/logger';
+import { Loader2, Users } from 'lucide-react';
 import { UserRole } from '../types/shared';
+import { TeamCard, TeamSquad } from '../components/teams';
+import { REQUIRED_COUNTS } from '../constants/players';
 
 // Helper to normalize owner names (handling slight variations if needed)
 const normalizeOwner = (name: string) => name?.trim() || 'Svincolato';
-
-type TeamSquad = {
-    managerName: string;
-    teamName: string;
-    logoUrl?: string; // Avatar
-    budget: number;
-    spent: number;
-    remaining: number;
-    players: any[];
-    isComplete: boolean;
-    roleCounts: { P: number; D: number; C: number; A: number };
-    totalPlayers: number;
-    teamId: string;
-};
-
-const REQUIRED_COUNTS = { P: 2, D: 8, C: 8, A: 6 };
 
 export const TeamsList = () => {
     const { players, loading: playersLoading, error, realTeams } = usePlayers();
     const { user } = useAuth();
     const [teamsAnalysis, setTeamsAnalysis] = useState<TeamSquad[]>([]);
-    const [fantasyTeams, setFantasyTeams] = useState<any[]>([]); // State for Fantasy Teams
-    const [loadingTeams, setLoadingTeams] = useState(true);
+    const [fantasyTeamData, setFantasyTeamData] = useState<Map<string, any>>(new Map());
+    const [loading, setLoading] = useState(true);
 
-    // Fetch Fantasy Teams
+    // Fetch fantasy team metadata (for logos etc.)
+    const fetchFantasyTeams = async () => {
+        try {
+            const response = await databases.listDocuments(DB_ID, COLL_FANTASY_TEAMS);
+            const map = new Map<string, any>();
+            response.documents.forEach(doc => {
+                map.set(normalizeOwner(doc.manager_name), doc);
+            });
+            setFantasyTeamData(map);
+        } catch (err) {
+            logger.error('[TeamsList] Error fetching fantasy teams:', err);
+        }
+    };
+
     useEffect(() => {
-        const fetchFantasyTeams = async () => {
-            try {
-                const response = await databases.listDocuments(DB_ID, COLL_FANTASY_TEAMS);
-                setFantasyTeams(response.documents);
-            } catch (err) {
-                console.error("Error fetching fantasy teams:", err);
-            } finally {
-                setLoadingTeams(false);
-            }
-        };
         fetchFantasyTeams();
     }, []);
 
-    // Process Players and Owners into Squads
+    // Group players by owner and calculate stats
     useEffect(() => {
-        if (!players.length || !fantasyTeams.length) return;
+        if (!players.length) return;
 
-        // 1. Get List of Managers (excluding "Svincolato" and potentially Ghost Admin if handled in usePlayers)
-        // owners array from usePlayers usually contains names. But we need metadata (Team Name, Logo) if available.
-        // usePlayers hook returns `owners` as string[]. We might need access to `teams` (Collection Documents) for metadata.
-        // The `teams` export from `usePlayers` likely contains the raw team documents.
+        const grouped = new Map<string, any[]>();
 
-        // Assuming `teams` from usePlayers hook contains the fantasy_teams documents
-        // If not, we might need to fetch them directly or reuse what's available.
-        // Let's assume `teams` has the data structure: { $id, manager_name, team_name, logo_url, credits_remaining, hidden, role }
+        players.forEach(p => {
+            const owner = normalizeOwner(p.owner || '');
+            if (owner === 'Svincolato') return;
 
-        // Filter valid teams
-        // Filter valid teams - Exclude Admin, Hidden, and 'g_admin' role
-        const activeTeams = fantasyTeams.filter((t: any) => !t.hidden && t.manager_name !== 'Admin' && t.role !== 'g_admin');
-
-        const analysis = activeTeams.map((team: any) => {
-            const managerName = team.manager_name || 'N/A';
-            const teamId = team.$id;
-
-            // Find players owned by this manager
-            // Note: DB player.owner stores the MANAGER NAME currently
-            const squadPlayers = players.filter(p => p.owner === managerName);
-
-            // Group by Role for Counts
-            const roleCounts = { P: 0, D: 0, C: 0, A: 0 };
-
-            // Handle Blocks for Goalkeepers!
-            // If a manager owns a GK Block, it counts as "Players"? 
-            // In the "Squad List" spec: "2 blocchi portiere, 8 difensori, 8 centrocampisti, 6 attaccanti"
-            // Wait, "2 blocchi portiere" - usually means 2 TEAMS (e.g. Inter + Milan).
-            // But individual players are stored.
-            // Logic: Count Unique GK Blocks? Or Count individual GKs?
-            // "rosa intera che è formata cosi: 2 blocchi portiere..."
-            // Usually FantaPL logic: You buy the BLOCK.
-            // So for P, we count unique `team_id` among owned GKs?
-            // Or simpler: Just grouping players.
-            // Let's verify: "2 blocchi portiere".
-            // So I should count unique Real Teams for GKs.
-
-            const gkTeams = new Set<string>();
-            let spent = 0;
-
-            squadPlayers.forEach(p => {
-                spent += (p.purchase_price || 0);
-
-                if (p.position === 'Portiere') {
-                    // Logic: Each real team counts as 1 block.
-                    // But wait, owner owns specific players? Or the block?
-                    // Previous tasks: "Update sync_players to enforce GK ownership from Team".
-                    // So if owner owns "Sommer", he owns "Inter Block".
-                    // Efficient way: Count unique team_ids for Portieri.
-                    gkTeams.add(p.team_id);
-                } else if (p.position === 'Difensore') roleCounts.D++;
-                else if (p.position === 'Centrocampista') roleCounts.C++;
-                else if (p.position === 'Attaccante') roleCounts.A++;
-            });
-
-            roleCounts.P = gkTeams.size;
-
-            const totalPlayers = roleCounts.P + roleCounts.D + roleCounts.C + roleCounts.A;
-            // Complete Check: 2 P (Blocks), 8 D, 8 C, 6 A
-            const isComplete =
-                roleCounts.P === 2 &&
-                roleCounts.D === 8 &&
-                roleCounts.C === 8 &&
-                roleCounts.A === 6;
-
-            const remaining = team.credits_remaining ?? 500;
-
-            return {
-                managerName,
-                teamName: team.team_name || `Squadra di ${managerName}`,
-                logoUrl: team.fantasylogo_url, // Fantasy team logo
-                budget: team.budget || 500,
-                spent,
-                remaining,
-                players: squadPlayers, // Raw list, we'll group in render
-                activePlayersCount: squadPlayers.length,
-                roleCounts,
-                isComplete,
-                totalPlayers,
-                teamId
-            };
+            if (!grouped.has(owner)) grouped.set(owner, []);
+            grouped.get(owner)!.push(p);
         });
 
-        // Custom sorting: Compound names (containing '-') go last.
-        // Within each group, sort alphabetically.
+        // Include GK blocks from realTeams
+        realTeams.forEach(team => {
+            const owner = normalizeOwner(team.goalkeeper_owner || '');
+            if (owner && owner !== 'Svincolato') {
+                // Get all GKs for this team
+                const teamGKs = players.filter(p => p.team_id === team.$id && p.position === 'Portiere');
+                if (teamGKs.length > 0 && !grouped.has(owner)) {
+                    grouped.set(owner, []);
+                }
+                // Add GKs if not already added
+                if (teamGKs.length > 0) {
+                    const existingPlayerIds = new Set(grouped.get(owner)?.map(p => p.$id) || []);
+                    teamGKs.forEach(gk => {
+                        if (!existingPlayerIds.has(gk.$id)) {
+                            grouped.get(owner)!.push({
+                                ...gk,
+                                quotation: team.goalkeeper_quotation || gk.quotation,
+                                purchase_price: team.goalkeeper_purchase_price || 0
+                            });
+                        }
+                    });
+                }
+            }
+        });
+
+        const analysis: TeamSquad[] = [];
+
+        grouped.forEach((ownerPlayers, owner) => {
+            // Calculate role counts (unique teams for P)
+            const pCount = new Set(ownerPlayers.filter(p => p.position === 'Portiere').map(p => p.team_id)).size;
+            const dCount = ownerPlayers.filter(p => p.position === 'Difensore').length;
+            const cCount = ownerPlayers.filter(p => p.position === 'Centrocampista').length;
+            const aCount = ownerPlayers.filter(p => p.position === 'Attaccante').length;
+
+            // Get fantasy team data
+            const ftData = fantasyTeamData.get(owner);
+
+            // Calculate spent (sum of purchase_price)
+            const spent = ownerPlayers.reduce((sum, p) => sum + (p.purchase_price || 0), 0);
+
+            // Use credits_remaining directly from DB
+            const remaining = ftData?.credits_remaining ?? 0;
+            const budget = ftData?.budget ?? 500;
+
+            analysis.push({
+                managerName: owner,
+                teamName: ftData?.team_name || `Team ${owner}`,
+                logoUrl: ftData?.fantasylogo_url,
+                budget,
+                spent,
+                remaining,
+                players: ownerPlayers,
+                isComplete: pCount === REQUIRED_COUNTS.P && dCount === REQUIRED_COUNTS.D && cCount === REQUIRED_COUNTS.C && aCount === REQUIRED_COUNTS.A,
+                roleCounts: { P: pCount, D: dCount, C: cCount, A: aCount },
+                totalPlayers: ownerPlayers.length,
+                teamId: ftData?.$id
+            });
+        });
+
+        // Custom Sorting: Compound names (with hyphens) go to the end, then alphabetical
         analysis.sort((a, b) => {
             const aHasHyphen = a.managerName.includes('-');
             const bHasHyphen = b.managerName.includes('-');
 
             if (aHasHyphen && !bHasHyphen) return 1;
             if (!aHasHyphen && bHasHyphen) return -1;
-
-            // Both are same category, sort alphabetically
             return a.managerName.localeCompare(b.managerName);
         });
 
-        setTeamsAnalysis(analysis);
-
-    }, [players, fantasyTeams]); // teams from usePlayers
-
-    if (playersLoading || loadingTeams) return (
-        <div className="min-h-screen bg-gradient-to-b from-pl-dark via-[#1a0a1f] to-pl-dark flex items-center justify-center">
-            <Loader2 className="w-12 h-12 animate-spin text-pl-teal" />
-        </div>
-    );
-
-    return (
-        <div className="min-h-screen bg-gradient-to-b from-pl-dark via-[#1a0a1f] to-pl-dark pb-20">
-            <div className="max-w-7xl mx-auto px-4 py-8">
-                {/* Header */}
-                <div className="mb-8 text-center md:text-left">
-                    <h1 className="text-3xl font-bold text-white flex items-center justify-center md:justify-start gap-3">
-                        <Users className="text-pl-teal" />
-                        Lista Rose
-                    </h1>
-                    <p className="text-gray-400 mt-2">
-                        Panoramica delle rose, budget residui e completamento squadre.
-                    </p>
-                </div>
-
-                {/* Teams Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {teamsAnalysis.map((team, idx) => (
-                        <TeamCard key={idx} team={team} realTeams={realTeams} />
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// Extracted TeamCard Component with Local State
-const TeamCard = ({ team, realTeams }: { team: TeamSquad, realTeams: any[] }) => {
-    const [activeFilter, setActiveFilter] = useState<'ALL' | 'P' | 'D' | 'C' | 'A'>('ALL');
-
-    const toggleFilter = (role: 'P' | 'D' | 'C' | 'A') => {
-        setActiveFilter(prev => prev === role ? 'ALL' : role);
-    };
-
-    return (
-        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-white/20 transition group">
-            {/* Card Header */}
-            <div className="p-5 bg-gradient-to-r from-white/5 to-transparent border-b border-white/5">
-                <div className="flex items-center gap-4 mb-4">
-                    {/* Logo/Avatar */}
-                    <div className="w-16 h-16 rounded-full bg-pl-teal/10 border-2 border-pl-teal/20 flex items-center justify-center overflow-hidden shrink-0 shadow-lg">
-                        {team.logoUrl ? (
-                            <img src={team.logoUrl} alt={team.teamName} className="w-full h-full object-cover" />
-                        ) : (
-                            <span className="text-2xl font-bold text-pl-teal">{team.managerName.charAt(0)}</span>
-                        )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                        <h3 className="text-xl font-bold text-white truncate" title={team.teamName}>{team.teamName}</h3>
-                        <div className="text-sm text-gray-400 font-medium">Allenatore: <span className="text-gray-200">{team.managerName}</span></div>
-                    </div>
-                </div>
-
-                {/* Budget & Status Row */}
-                <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                        <span className="text-xs text-gray-500 font-bold uppercase tracking-wider">Budget</span>
-                        <div className="flex items-center gap-1.5 text-pl-teal font-mono font-bold text-lg">
-                            <Coins size={16} />
-                            {team.remaining} <span className="text-xs text-gray-500 font-normal self-end mb-0.5">/ {team.budget}</span>
-                        </div>
-                    </div>
-
-                    <div className={`px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${team.isComplete
-                        ? 'bg-green-500/20 text-green-400 border-green-500/30'
-                        : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
-                        }`}>
-                        {team.isComplete ? <Shield size={12} /> : <AlertCircle size={12} />}
-                        {team.isComplete ? 'ROSA COMPLETA' : 'INCOMPLETA'}
-                    </div>
-                </div>
-            </div>
-
-            {/* Squad Breakdown (Clickable Filters) */}
-            <div className="p-4 bg-black/20 text-xs text-gray-400 grid grid-cols-4 gap-2 text-center border-b border-white/5">
-                <button
-                    onClick={() => toggleFilter('P')}
-                    className={`transition-colors py-1 rounded hover:bg-white/5 ${activeFilter === 'P' ? 'bg-white/10 ring-1 ring-white/20' : ''} ${team.roleCounts.P === 2 ? 'text-green-400 font-bold' : ''}`}
-                >
-                    P: {team.roleCounts.P}/2
-                </button>
-                <button
-                    onClick={() => toggleFilter('D')}
-                    className={`transition-colors py-1 rounded hover:bg-white/5 ${activeFilter === 'D' ? 'bg-white/10 ring-1 ring-white/20' : ''} ${team.roleCounts.D === 8 ? 'text-green-400 font-bold' : ''}`}
-                >
-                    D: {team.roleCounts.D}/8
-                </button>
-                <button
-                    onClick={() => toggleFilter('C')}
-                    className={`transition-colors py-1 rounded hover:bg-white/5 ${activeFilter === 'C' ? 'bg-white/10 ring-1 ring-white/20' : ''} ${team.roleCounts.C === 8 ? 'text-green-400 font-bold' : ''}`}
-                >
-                    C: {team.roleCounts.C}/8
-                </button>
-                <button
-                    onClick={() => toggleFilter('A')}
-                    className={`transition-colors py-1 rounded hover:bg-white/5 ${activeFilter === 'A' ? 'bg-white/10 ring-1 ring-white/20' : ''} ${team.roleCounts.A === 6 ? 'text-green-400 font-bold' : ''}`}
-                >
-                    A: {team.roleCounts.A}/6
-                </button>
-            </div>
-
-            {/* Detailed Roster */}
-            <div className="max-h-[400px] overflow-y-auto divide-y divide-white/5 bg-black/10 transition-all">
-                {/* Conditionally Render Sections based on activeFilter */}
-                {(activeFilter === 'ALL' || activeFilter === 'P') && (
-                    <SquadRoleSection players={team.players} role="Portiere" label="Portieri" required={2} countType="block" realTeams={realTeams} />
-                )}
-                {(activeFilter === 'ALL' || activeFilter === 'D') && (
-                    <SquadRoleSection players={team.players} role="Difensore" label="Difensori" required={8} realTeams={realTeams} />
-                )}
-                {(activeFilter === 'ALL' || activeFilter === 'C') && (
-                    <SquadRoleSection players={team.players} role="Centrocampista" label="Centrocampisti" required={8} realTeams={realTeams} />
-                )}
-                {(activeFilter === 'ALL' || activeFilter === 'A') && (
-                    <SquadRoleSection players={team.players} role="Attaccante" label="Attaccanti" required={6} realTeams={realTeams} />
-                )}
-            </div>
-        </div>
-    );
-};
-const SquadRoleSection = ({ players, role, label, required, countType = 'player', realTeams = [] }: { players: any[], role: string, label: string, required: number, countType?: 'player' | 'block', realTeams?: any[] }) => {
-    const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
-
-    const toggleBlock = (teamId: string) => {
-        setExpandedBlocks(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(teamId)) newSet.delete(teamId);
-            else newSet.add(teamId);
-            return newSet;
-        });
-    };
-
-    // Filter players by role
-    const rolePlayers = players.filter(p => p.position === role);
-
-    // For Goalkeepers: Group into blocks by team
-    if (role === 'Portiere') {
-        // Get unique team IDs for GKs owned by this manager
-        const teamIds = [...new Set(rolePlayers.map(p => p.team_id))];
-
-        // Create block data
-        const blocks = teamIds.map(teamId => {
-            const teamData = realTeams.find(t => t.$id === teamId);
-            const teamPlayers = rolePlayers.filter(p => p.team_id === teamId);
-            return {
-                teamId,
-                teamName: teamPlayers[0]?.team_name || 'Team',
-                teamShortName: teamPlayers[0]?.team_short_name || '???',
-                quotation: teamData?.goalkeeper_quotation || 0,
-                purchasePrice: teamData?.goalkeeper_purchase_price || 0,
-                players: teamPlayers
-            };
+        // Filter out g_admin from the list (unless viewing as g_admin)
+        const currentUserRole = (user?.prefs?.role as UserRole) || 'user';
+        const filteredAnalysis = analysis.filter(team => {
+            // Find the user's role for this manager
+            const managerData = fantasyTeamData.get(team.managerName);
+            const managerRole = managerData?.role as UserRole | undefined;
+            // Hide g_admin from non-g_admin users
+            if (managerRole === 'g_admin' && currentUserRole !== 'g_admin') {
+                return false;
+            }
+            return true;
         });
 
-        // Sort blocks by purchase price descending
-        blocks.sort((a, b) => b.purchasePrice - a.purchasePrice);
+        setTeamsAnalysis(filteredAnalysis);
+        setLoading(false);
+    }, [players, realTeams, fantasyTeamData, user]);
 
+    if (playersLoading || loading) {
         return (
-            <div className="p-3">
-                <div className="flex items-center justify-between mb-2 px-1">
-                    <span className="text-[10px] uppercase font-bold text-gray-500">{label} (Blocchi)</span>
-                </div>
-
-                {blocks.length === 0 ? (
-                    <div className="px-2 py-1 text-xs text-gray-600 italic">-</div>
-                ) : (
-                    <div className="space-y-1">
-                        {blocks.map(block => (
-                            <div key={block.teamId}>
-                                {/* Block Header - Clickable */}
-                                <div
-                                    onClick={() => toggleBlock(block.teamId)}
-                                    className="flex items-center justify-between px-2 py-2 rounded hover:bg-white/5 transition group cursor-pointer"
-                                >
-                                    {/* Left: Team Logo & Photo Stack */}
-                                    <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
-                                        <div className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center shrink-0" title={block.teamName}>
-                                            <img
-                                                src={`https://images.fotmob.com/image_resources/logo/teamlogo/${block.teamId.replace('team_', '')}.png`}
-                                                alt={block.teamShortName}
-                                                className="w-full h-full object-contain drop-shadow-md"
-                                                loading="lazy"
-                                                onError={(e) => {
-                                                    const target = e.target as HTMLImageElement;
-                                                    target.style.display = 'none';
-                                                    if (target.parentElement) {
-                                                        target.parentElement.innerText = block.teamShortName?.substring(0, 3) || '?';
-                                                        target.parentElement.className = "w-8 h-8 md:w-9 md:h-9 flex items-center justify-center shrink-0 bg-white/10 rounded-md text-[9px] font-bold text-gray-400";
-                                                    }
-                                                }}
-                                            />
-                                        </div>
-                                        {/* Dynamic Grid for symmetry with player photo */}
-                                        <div className="w-8 h-8 md:w-9 md:h-9 shrink-0 overflow-hidden rounded-full border border-white/20 bg-slate-800 shadow-lg pl-0">
-                                            <div className={`grid w-full h-full p-[1px] gap-[1px] ${block.players.length === 2 ? 'grid-cols-2' :
-                                                block.players.length >= 3 ? 'grid-cols-2 grid-rows-2' :
-                                                    'grid-cols-1'
-                                                }`}>
-                                                {block.players.length === 1 ? (
-                                                    <div className="w-full h-full overflow-hidden">
-                                                        <img src={block.players[0].image_url} alt="" className="w-full h-full object-cover" />
-                                                    </div>
-                                                ) : block.players.length === 2 ? (
-                                                    block.players.map(p => (
-                                                        <div key={p.$id} className="w-full h-full overflow-hidden">
-                                                            <img src={p.image_url} alt="" className="w-full h-full object-cover scale-[1.1]" />
-                                                        </div>
-                                                    ))
-                                                ) : block.players.length === 3 ? (
-                                                    block.players.map(p => (
-                                                        <div key={p.$id} className="w-full h-full overflow-hidden">
-                                                            <img src={p.image_url} alt="" className="w-full h-full object-cover scale-[1.2]" />
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    // 4 or more players
-                                                    block.players.slice(0, 4).map((p, idx) => (
-                                                        <div key={p.$id} className="w-full h-full overflow-hidden relative">
-                                                            <img src={p.image_url} alt="" className="w-full h-full object-cover scale-[1.2]" />
-                                                            {idx === 3 && block.players.length > 4 && (
-                                                                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-[8px] font-bold text-white">
-                                                                    +{block.players.length - 3}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <span className="text-sm md:text-base text-gray-200 truncate group-hover:text-white transition font-medium">
-                                                Blocco {block.teamShortName}
-                                            </span>
-                                            <ChevronDown size={14} className={`text-gray-500 transition shrink-0 ${expandedBlocks.has(block.teamId) ? 'rotate-180' : ''}`} />
-                                        </div>
-                                    </div>
-
-                                    {/* Right: Quotation, Price */}
-                                    <div className="flex items-center gap-3 shrink-0 ml-2">
-                                        <div className="flex flex-col items-end leading-none">
-                                            <span className="text-[8px] md:text-[10px] text-gray-500 mb-0.5">Q</span>
-                                            <span className="text-xs md:text-base font-bold text-white">{block.quotation}</span>
-                                        </div>
-                                        <div className="flex flex-col items-end leading-none w-8">
-                                            <span className="text-[8px] md:text-[10px] text-gray-500 mb-0.5">P</span>
-                                            <span className="text-xs md:text-base font-bold text-pl-teal">{block.purchasePrice || '-'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Expanded: List of GKs */}
-                                {expandedBlocks.has(block.teamId) && (
-                                    <div className="ml-6 pl-3 border-l border-white/10 space-y-1 py-1">
-                                        {block.players.map(p => (
-                                            <div key={p.$id} className="flex items-center gap-2 py-1 text-xs text-gray-400">
-                                                <div className="w-6 h-6 rounded-full bg-white/10 overflow-hidden border border-white/20 shrink-0">
-                                                    {p.image_url ? (
-                                                        <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-500">?</div>
-                                                    )}
-                                                </div>
-                                                <span className={`truncate ${p.is_active === false ? 'italic text-gray-500' : ''}`}>
-                                                    {p.name}{p.is_active === false ? '*' : ''}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )}
+            <div className="flex flex-col items-center justify-center h-96 gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-pl-teal" />
+                <span className="text-gray-400">Caricamento rose...</span>
             </div>
         );
     }
 
-    // Non-GK players: Standard list
-    // Sort by Price Desc
-    rolePlayers.sort((a, b) => (b.purchase_price || 0) - (a.purchase_price || 0));
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center h-96 text-red-400">
+                <p>Errore: {error}</p>
+            </div>
+        );
+    }
 
     return (
-        <div className="p-3">
-            <div className="flex items-center justify-between mb-2 px-1">
-                <span className="text-[10px] uppercase font-bold text-gray-500">{label}</span>
-                <span className={`text-[10px] font-mono ${rolePlayers.length === (countType === 'block' ? 99 : required) ? 'text-green-400' : 'text-gray-600'}`}>
-                    {/* Optional count display */}
-                </span>
+        <div className="max-w-7xl mx-auto p-4 md:p-6">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-8">
+                <div>
+                    <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                        <Users className="text-pl-teal" />
+                        Rose Fantacalcio
+                    </h1>
+                    <p className="text-gray-400 mt-1">{teamsAnalysis.length} squadre registrate</p>
+                </div>
             </div>
 
-            {rolePlayers.length === 0 ? (
-                <div className="px-2 py-1 text-xs text-gray-600 italic">-</div>
-            ) : (
-                <div className="space-y-1">
-                    {rolePlayers.map(p => (
-                        <div key={p.$id} className="flex items-center justify-between px-2 py-2 rounded hover:bg-white/5 transition group">
-                            {/* Left: Team Logo, Player Photo, Name */}
-                            <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
-                                <div className="w-8 h-8 md:w-9 md:h-9 flex items-center justify-center shrink-0" title={p.team_name}>
-                                    <img
-                                        src={`https://images.fotmob.com/image_resources/logo/teamlogo/${p.team_id.replace('team_', '')}.png`}
-                                        alt={p.team_short_name}
-                                        className="w-full h-full object-contain drop-shadow-md"
-                                        loading="lazy"
-                                        onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
-                                            target.style.display = 'none';
-                                            if (target.parentElement) {
-                                                target.parentElement.innerText = p.team_short_name?.substring(0, 3) || '?';
-                                                target.parentElement.className = "w-8 h-8 md:w-9 md:h-9 flex items-center justify-center shrink-0 bg-white/10 rounded-md text-[9px] font-bold text-gray-400";
-                                            }
-                                        }}
-                                    />
-                                </div>
-                                {/* Player Photo wrapper - Match the padding/alignment of GK grid */}
-                                <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-slate-800 border border-white/20 overflow-hidden shrink-0 shadow-lg">
-                                    {p.image_url ? (
-                                        <img src={p.image_url} alt={p.name} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-[8px] text-gray-500">?</div>
-                                    )}
-                                </div>
-                                <span className={`text-sm md:text-base text-gray-200 truncate group-hover:text-white transition font-medium ${p.is_active === false ? 'italic !text-gray-500' : ''}`}>
-                                    {p.name}{p.is_active === false ? '*' : ''}
-                                </span>
-                            </div>
-
-                            {/* Right: Quotation, Price - Scaled */}
-                            <div className="flex items-center gap-3 shrink-0 ml-2">
-                                <div className="flex flex-col items-end leading-none">
-                                    <span className="text-[8px] md:text-[10px] text-gray-500 mb-0.5">Q</span>
-                                    <span className="text-xs md:text-base font-bold text-white">
-                                        {p.quotation}
-                                    </span>
-                                </div>
-                                <div className="flex flex-col items-end leading-none w-8">
-                                    <span className="text-[8px] md:text-[10px] text-gray-500 mb-0.5">P</span>
-                                    <span className="text-xs md:text-base font-bold text-pl-teal">
-                                        {p.purchase_price || '-'}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+            {/* Teams Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                {teamsAnalysis.map(team => (
+                    <TeamCard key={team.managerName} team={team} realTeams={realTeams} />
+                ))}
+            </div>
         </div>
     );
 };
