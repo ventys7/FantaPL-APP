@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { functions } from '../lib/appwrite';
+import { logger } from '../lib/logger';
 import { ExecutionMethod } from 'appwrite';
 
 const GET_PL_FIXTURES_FUNCTION_ID = '695a6d7100173e92ccfd';
@@ -52,7 +53,7 @@ export function useFixtures() {
                 setLastUpdate(new Date());
             }
         } catch (error) {
-            console.error('Error fetching fixtures:', error);
+            logger.error('[useFixtures] Error fetching fixtures:', error);
         } finally {
             setLoading(false);
             setRefreshing(false);

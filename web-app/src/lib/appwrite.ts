@@ -3,9 +3,9 @@ import { logger } from './logger';
 
 export const client = new Client();
 
-// Hardcoded for debugging - replace with env vars once working
-const endpoint = 'https://fra.cloud.appwrite.io/v1';
-const projectId = '6952ee8b000ce55dc6bc';
+// Use environment variables for credentials
+const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1';
+const projectId = import.meta.env.VITE_APPWRITE_PROJECT_ID || '6952ee8b000ce55dc6bc';
 
 logger.debug('[Appwrite] Initializing with:', { endpoint, projectId });
 

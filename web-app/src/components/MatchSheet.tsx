@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Shirt, RefreshCw, AlertCircle } from 'lucide-react';
 import { functions } from '../lib/appwrite';
+import { logger } from '../lib/logger';
 import { ExecutionMethod } from 'appwrite';
 import { usePlayers } from '../hooks/usePlayers';
 
@@ -39,7 +40,7 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                     : fixture.lineups;
                 setLineups(parsed);
             } catch (e) {
-                console.error("Error parsing stored lineups", e);
+                logger.error('[MatchSheet] Error parsing stored lineups', e);
             }
         } else {
             // Auto-fetch ONLY if match is live/finished to avoid spamming API for scheduled matches

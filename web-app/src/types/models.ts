@@ -1,17 +1,14 @@
 import { AppwriteDocument } from './shared';
 
+// Re-export Player from unified source
+export type { Player, RealTeam, PlayerPosition } from './player';
+
 export interface Team extends AppwriteDocument {
     name: string;
     short_name: string;
     logo_url?: string;
 }
 
-export interface Player extends AppwriteDocument {
-    name: string;
-    role: 'GK' | 'DEF' | 'MID' | 'ATT';
-    real_team_id: string;
-    is_gk_block?: boolean;
-}
 
 export interface Fixture extends AppwriteDocument {
     gameweek: number;

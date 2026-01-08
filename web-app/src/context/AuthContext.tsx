@@ -119,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             await account.deleteSession('current');
         } catch (error) {
-            console.error('Logout error:', error);
+            logger.error('[Auth] Logout error:', error);
         }
         setUser(null);
     };

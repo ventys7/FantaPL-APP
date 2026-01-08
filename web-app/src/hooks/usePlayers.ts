@@ -1,38 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { databases, DB_ID, COLL_PLAYERS, COLL_TEAMS } from '../lib/appwrite';
+import { logger } from '../lib/logger';
 import { Query } from 'appwrite';
+import { Player, RealTeam } from '../types/player';
 
-export interface Player {
-    $id: string;
-    fotmob_id: string;
-    name: string;
-    team_id: string;
-    team_name: string;       // Full name from DB
-    team_short_name: string; // Short name from real_teams
-    position: string;
-    image_url: string;
-    quotation: number;
-    purchase_price: number;
-    owner: string | null;
-    is_active: boolean;
-    created_at: string;
-}
+// Re-export for backward compatibility
+export type { Player, RealTeam } from '../types/player';
 
-// Interface for Real Team Metadata
-export interface RealTeam {
-    $id: string;
-    name: string;
-    short_name: string;
-    goalkeeper_owner?: string | null;
-    goalkeeper_quotation?: number | null;
-    goalkeeper_purchase_price?: number | null;
-}
-
-interface Team {
-    $id: string;
-    name: string;
-    short_name: string;
-}
 
 interface UsePlayersReturn {
     players: Player[];
@@ -111,7 +85,7 @@ export function usePlayers(): UsePlayersReturn {
 
             setPlayers(allPlayers);
         } catch (err: any) {
-            console.error('Error fetching players:', err);
+            logger.error('[usePlayers] Error fetching players:', err);
             setError(err.message || 'Errore nel caricamento giocatori');
         } finally {
             setLoading(false);

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { databases, storage, DB_ID, COLL_FANTASY_TEAMS, BUCKET_LOGOS } from '../lib/appwrite';
+import { logger } from '../lib/logger';
 import { useAuth } from '../context/AuthContext';
 import { ID } from 'appwrite';
 
@@ -64,7 +65,7 @@ export const useDashboard = () => {
                 opponentScore: 0
             });
         } catch (error) {
-            console.error('Error fetching team:', error);
+            logger.error('[useDashboard] Error fetching team:', error);
         } finally {
             setLoading(false);
         }
@@ -98,7 +99,7 @@ export const useDashboard = () => {
             setTeam(prev => prev ? { ...prev, name: newName, logoUrl } : null);
 
         } catch (error) {
-            console.error('Error updating team:', error);
+            logger.error('[useDashboard] Error updating team:', error);
             throw error;
         }
     };

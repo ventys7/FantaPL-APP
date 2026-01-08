@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocat
 import { logger } from './lib/logger';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
-import { Navbar } from './components/Navbar'; // Keep for now or remove if unused. Layout uses it.
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { Dashboard } from './pages/Dashboard';
@@ -63,10 +62,10 @@ const LoadingSpinner = () => (
     </div>
 );
 
-// Access Control Component for Specific Users
-const AllowedUserCheck = ({ children, allowedId }: { children: ReactNode, allowedId: string }) => {
-    const { user } = useAuth();
-    if (user?.$id !== allowedId) return <Navigate to="/admin" replace />;
+// Role-Based Access Control Component
+const GhostAdminOnly = ({ children }: { children: ReactNode }) => {
+    const { hasRole } = useAuth();
+    if (!hasRole('g_admin')) return <Navigate to="/admin" replace />;
     return <>{children}</>;
 };
 
@@ -115,10 +114,8 @@ function App() {
                                     } />
                                     <Route path="votes" element={<VoteEntry />} />
                                     <Route path="system" element={
-                                        <ProtectedRoute requiredRole="admin">
-                                            <AllowedUserCheck allowedId="695842e1003a3db19fea">
-                                                <AdminSystem />
-                                            </AllowedUserCheck>
+                                        <ProtectedRoute requiredRole="g_admin">
+                                            <AdminSystem />
                                         </ProtectedRoute>
                                     } />
 
