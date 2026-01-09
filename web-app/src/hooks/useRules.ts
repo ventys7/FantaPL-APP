@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { databases, DB_ID, COLL_SETTINGS, COLL_ARCHIVE } from '../lib/appwrite';
-import { Query } from 'appwrite';
-import { Section, ArchivedRules, CenniPrincipali } from '../types/rules';
+import { databases, DB_ID, COLL_SETTINGS } from '../lib/appwrite';
+import { Section, CenniPrincipali } from '../types/rules';
 import { logger } from '../lib/logger';
 
 // Default sections data
@@ -31,7 +30,6 @@ export function useRules() {
     const [saving, setSaving] = useState(false);
     const [cenniPrincipali, setCenniPrincipali] = useState<CenniPrincipali>(DEFAULT_CENNI);
     const [sections, setSections] = useState<Section[]>(DEFAULT_SECTIONS);
-    const [archivedRules, setArchivedRules] = useState<ArchivedRules[]>([]);
     const [undoHistory, setUndoHistory] = useState<{ field: string, value: string }[]>([]);
     const [docId, setDocId] = useState<string | null>(null);
 
@@ -74,24 +72,11 @@ export function useRules() {
         }
     };
 
-    const loadArchive = async () => {
-        try {
-            const response = await databases.listDocuments(DB_ID, COLL_ARCHIVE, [
-                Query.orderDesc('archived_at')
-            ]);
-            setArchivedRules(response.documents as unknown as ArchivedRules[]);
-        } catch (error) {
-            logger.info('Archive collection may not exist yet:', error);
-            setArchivedRules([]);
-        }
-    };
-
     const saveRules = async () => {
         if (!docId) return false;
 
         setSaving(true);
         try {
-            // Check if we need to wrap sections with new title or just array
             const dataToSave = {
                 mainTitle: cenniPrincipali.title,
                 sections: sections
@@ -161,7 +146,6 @@ export function useRules() {
 
     useEffect(() => {
         loadRules();
-        loadArchive();
     }, []);
 
     return {
@@ -170,7 +154,6 @@ export function useRules() {
         saving,
         cenniPrincipali,
         sections,
-        archivedRules,
         undoHistory,
 
         // Setters

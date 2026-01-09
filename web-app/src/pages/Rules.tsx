@@ -10,7 +10,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSo
 export function Rules() {
     const { user, hasRole } = useAuth();
     const {
-        loading, saving, cenniPrincipali, sections, archivedRules, undoHistory,
+        loading, saving, cenniPrincipali, sections, undoHistory,
         setCenniPrincipali, setSections,
         loadRules, saveRules, updateSection, addSection, removeSection,
         addToUndoHistory, undo, clearUndoHistory

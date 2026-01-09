@@ -26,6 +26,5 @@ export const COLL_PLAYERS = 'players';
 export const COLL_FIXTURES = 'fixtures';
 export const COLL_PERFORMANCES = 'performances';
 export const COLL_FANTASY_TEAMS = 'fantasy_teams';
-export const COLL_ARCHIVE = 'rules_archive';
 export const COLL_TRADE_PROPOSALS = 'trade_proposals';
 export const BUCKET_LOGOS = 'team_logos';

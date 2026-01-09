@@ -1,28 +1,56 @@
 const isDev = import.meta.env.DEV;
 
+type LogLevel = 'info' | 'warn' | 'error' | 'debug';
+
+interface LoggerContext {
+    info: (...args: unknown[]) => void;
+    warn: (...args: unknown[]) => void;
+    error: (...args: unknown[]) => void;
+    debug: (...args: unknown[]) => void;
+}
+
+function createLogMethod(level: LogLevel, prefix: string) {
+    const levelTag = `[${level.toUpperCase()}]`;
+    const consoleFn = level === 'debug' ? console.debug :
+        level === 'warn' ? console.warn :
+            level === 'error' ? console.error : console.log;
+
+    return (...args: unknown[]) => {
+        // Errors always visible (for production debugging)
+        // Other levels only in development
+        if (level === 'error' || isDev) {
+            consoleFn(levelTag, prefix, ...args);
+        }
+    };
+}
+
 export const logger = {
-    info: (...args: any[]) => {
-        if (isDev) {
-            console.log('[INFO]', ...args);
-        }
+    info: (...args: unknown[]) => {
+        if (isDev) console.log('[INFO]', ...args);
     },
-    warn: (...args: any[]) => {
-        if (isDev) {
-            console.warn('[WARN]', ...args);
-        }
+    warn: (...args: unknown[]) => {
+        if (isDev) console.warn('[WARN]', ...args);
     },
-    error: (...args: any[]) => {
-        // Errors usually should still be visible in production for debugging via browser console if needed, 
-        // OR we might want to suppress them too. 
-        // Typically, we keep errors or send them to a service (Sentry). 
-        // For now, we'll log them always or strictly in Dev? 
-        // User asked for "debuggable", so removing errors in prod might hide issues.
-        // Let's keep errors in prod but tagged.
+    error: (...args: unknown[]) => {
+        // Errors always visible for debugging
         console.error('[ERROR]', ...args);
     },
-    debug: (...args: any[]) => {
-        if (isDev) {
-            console.debug('[DEBUG]', ...args);
-        }
+    debug: (...args: unknown[]) => {
+        if (isDev) console.debug('[DEBUG]', ...args);
+    },
+
+    /**
+     * Creates a logger with a specific context prefix.
+     * Usage: const log = logger.withContext('useTrades');
+     *        log.info('Creating proposal');
+     */
+    withContext: (context: string): LoggerContext => {
+        const prefix = `[${context}]`;
+        return {
+            info: createLogMethod('info', prefix),
+            warn: createLogMethod('warn', prefix),
+            error: createLogMethod('error', prefix),
+            debug: createLogMethod('debug', prefix)
+        };
     }
 };
