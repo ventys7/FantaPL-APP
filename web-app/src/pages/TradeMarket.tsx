@@ -10,7 +10,7 @@ import { TradeProposal } from '../types/trade';
 
 export const TradeMarket = () => {
     const { user } = useAuth();
-    const { receivedProposals, sentProposals, tradeHistory, leagueHistory, loading, error, createProposal, acceptProposal, rejectProposal, cancelProposal, refresh } = useTrades();
+    const { receivedProposals, sentProposals, tradeHistory, leagueHistory, loading, error, createProposal, acceptProposal, rejectProposal, cancelProposal } = useTrades();
     const { players } = usePlayers();
 
     const [showModal, setShowModal] = useState(false);

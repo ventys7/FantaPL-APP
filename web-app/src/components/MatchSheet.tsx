@@ -1,17 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Shirt, RefreshCw, AlertCircle } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 import { functions } from '../lib/appwrite';
 import { logger } from '../lib/logger';
 import { ExecutionMethod } from 'appwrite';
 import { usePlayers } from '../hooks/usePlayers';
-import { PlayerRow } from './matchsheet/PlayerRow';
-import { LineupsData, TeamLineup, MatchEvent, FantasyPlayerData } from '../types/matchsheet';
+import { LineupsData, MatchEvent, FantasyPlayerData } from '../types/matchsheet';
+import { MatchHeader, MatchScoreboard, MatchFormation } from './matchsheet/structure';
+
+import { Fixture, Team } from '../types/shared';
 
 const FETCH_LINEUPS_FUNCTION_ID = '6959a2f4001012412402';
 
 interface MatchSheetProps {
-    fixture: any;
-    teams: Map<string, any>;
+    fixture: Fixture;
+    teams: Map<string, Team>;
     onClose: () => void;
 }
 
@@ -138,54 +140,6 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
         }
     }, [getPlayerEvents, lineups]);
 
-    // Render formation
-    const renderFormation = (teamLineup: TeamLineup | null) => {
-        if (!teamLineup?.lineup) {
-            return (
-                <div className="flex flex-col items-center justify-center p-8 text-gray-400 italic">
-                    <Shirt className="w-8 h-8 mb-2 opacity-20" />
-                    Lineup not available
-                </div>
-            );
-        }
-
-        return (
-            <div className="flex flex-col gap-2">
-                <div className="text-center text-xs font-bold bg-white/5 py-1 rounded mb-2">
-                    {teamLineup.formation || 'Unknown Formation'}
-                </div>
-                {/* Starters */}
-                <div className="space-y-1">
-                    <h4 className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Starters</h4>
-                    {teamLineup.lineup.map(p => (
-                        <PlayerRow
-                            key={p.id}
-                            player={p}
-                            isBench={false}
-                            events={getPlayerEvents(p.id)}
-                            minutesPlayed={calculateMinutesPlayed(p.id, false)}
-                            fantasyData={getFantasyPlayerData(p.id)}
-                        />
-                    ))}
-                </div>
-                {/* Bench */}
-                <div className="space-y-1 mt-4">
-                    <h4 className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-2">Bench</h4>
-                    {teamLineup.bench.map(p => (
-                        <PlayerRow
-                            key={p.id}
-                            player={p}
-                            isBench={true}
-                            events={getPlayerEvents(p.id)}
-                            minutesPlayed={calculateMinutesPlayed(p.id, true)}
-                            fantasyData={getFantasyPlayerData(p.id)}
-                        />
-                    ))}
-                </div>
-            </div>
-        );
-    };
-
     // Render goal scorer for scoreboard
     const renderGoalScorer = (e: MatchEvent, i: number) => (
         <div key={i} className="text-xs md:text-base font-medium text-white/90 whitespace-nowrap text-center">
@@ -204,71 +158,21 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5">
-                    <div className="flex items-center gap-4">
-                        <div className="flex flex-col">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                <span className="text-pl-pink">Match Center</span>
-                            </h2>
-                            <span className="text-xs text-gray-400">
-                                {new Date(fixture.date).toLocaleString(undefined, {
-                                    year: 'numeric', month: '2-digit', day: '2-digit',
-                                    hour: '2-digit', minute: '2-digit'
-                                })}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={fetchLineups}
-                            disabled={loading}
-                            className={`p-2 rounded-full hover:bg-white/10 transition ${loading ? 'animate-spin text-pl-teal' : 'text-gray-400'}`}
-                        >
-                            <RefreshCw className="w-5 h-5" />
-                        </button>
-                        <button onClick={onClose} className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition">
-                            <X className="w-5 h-5 text-white" />
-                        </button>
-                    </div>
-                </div>
+                <MatchHeader
+                    date={fixture.date}
+                    loading={loading}
+                    onRefresh={fetchLineups}
+                    onClose={onClose}
+                />
 
                 {/* Scoreboard */}
-                <div className="flex flex-col bg-gradient-to-r from-[#37003c] to-[#1f0029] border-b border-white/10 shrink-0">
-                    <div className="flex items-start justify-between p-6 md:p-3 md:pb-3">
-                        {/* Home Team & Goals */}
-                        <div className="flex flex-col items-center justify-start w-1/3">
-                            {homeTeam?.logo_url && <img src={homeTeam.logo_url} className="w-16 h-16 md:w-20 md:h-20 object-contain mb-2" />}
-                            <span className="font-bold text-white text-center leading-tight mb-2 min-h-[2.5em] flex items-center justify-center">{homeTeam?.name}</span>
-                            <div className="flex flex-col items-center gap-1 w-full">
-                                {lineups?.events
-                                    ?.filter(e => (e.isHome || e.team?.name === homeTeam?.name) && (e.type === 'Goal' || e.type === 'OwnGoal'))
-                                    .map(renderGoalScorer)}
-                            </div>
-                        </div>
-
-                        {/* Result & Status */}
-                        <div className="flex flex-col items-center pt-4 w-1/3">
-                            <div className="text-4xl md:text-5xl font-bold text-white font-mono tracking-tighter text-center">
-                                {fixture.home_score ?? 0} - {fixture.away_score ?? 0}
-                            </div>
-                            <div className="mt-2 px-3 py-1 bg-white/10 rounded text-xs font-bold text-pl-teal uppercase tracking-widest text-center">
-                                {fixture.status === 'IN_PLAY' || fixture.status === 'PAUSED' ? `${fixture.minute}'` : fixture.status}
-                            </div>
-                        </div>
-
-                        {/* Away Team & Goals */}
-                        <div className="flex flex-col items-center justify-start w-1/3">
-                            {awayTeam?.logo_url && <img src={awayTeam.logo_url} className="w-16 h-16 md:w-20 md:h-20 object-contain mb-2" />}
-                            <span className="font-bold text-white text-center leading-tight mb-2 min-h-[2.5em] flex items-center justify-center">{awayTeam?.name}</span>
-                            <div className="flex flex-col items-center gap-1 w-full">
-                                {lineups?.events
-                                    ?.filter(e => (!e.isHome && e.team?.name !== homeTeam?.name || e.team?.name === awayTeam?.name) && (e.type === 'Goal' || e.type === 'OwnGoal'))
-                                    .map(renderGoalScorer)}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <MatchScoreboard
+                    fixture={fixture}
+                    homeTeam={homeTeam}
+                    awayTeam={awayTeam}
+                    events={lineups?.events || []}
+                    renderGoalScorer={renderGoalScorer}
+                />
 
                 {/* Mobile Tabs */}
                 <div className="md:hidden flex border-b border-white/10 shrink-0 bg-[#18181b] z-20">
@@ -303,10 +207,20 @@ export function MatchSheet({ fixture, teams, onClose }: MatchSheetProps) {
 
                     <div className="md:grid md:grid-cols-2 gap-px bg-white/5 min-h-full pb-8">
                         <div className={`bg-[#18181b] p-4 ${activeTab === 'home' ? 'block' : 'hidden md:block'}`}>
-                            {renderFormation(lineups?.home || null)}
+                            <MatchFormation
+                                teamLineup={lineups?.home || null}
+                                getPlayerEvents={getPlayerEvents}
+                                calculateMinutesPlayed={calculateMinutesPlayed}
+                                getFantasyPlayerData={getFantasyPlayerData}
+                            />
                         </div>
                         <div className={`bg-[#18181b] p-4 md:border-l border-white/5 ${activeTab === 'away' ? 'block' : 'hidden md:block'}`}>
-                            {renderFormation(lineups?.away || null)}
+                            <MatchFormation
+                                teamLineup={lineups?.away || null}
+                                getPlayerEvents={getPlayerEvents}
+                                calculateMinutesPlayed={calculateMinutesPlayed}
+                                getFantasyPlayerData={getFantasyPlayerData}
+                            />
                         </div>
                     </div>
                 </div>

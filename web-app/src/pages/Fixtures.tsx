@@ -73,7 +73,7 @@ export function Fixtures() {
     // Convert for MatchSheet
     const convertForMatchSheet = (match: Fixture) => ({
         $id: `match_${match.id}`,
-        external_id: match.id,
+        external_id: parseInt(match.id),
         gameweek: match.gameweek,
         home_team_id: `team_${match.home.id}`,
         away_team_id: `team_${match.away.id}`,
@@ -82,7 +82,13 @@ export function Fixtures() {
         home_score: match.homeScore,
         away_score: match.awayScore,
         minute: match.minute ? parseInt(match.minute) : null,
-        season: 2025
+        season: 2025,
+        comp_id: 47,
+        $createdAt: new Date().toISOString(),
+        $updatedAt: new Date().toISOString(),
+        $permissions: [],
+        $collectionId: 'mock_collection',
+        $databaseId: 'mock_db'
     });
 
     return (

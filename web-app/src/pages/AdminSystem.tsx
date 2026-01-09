@@ -12,7 +12,7 @@ export function AdminSystem() {
     // Function IDs
     const PL_FUNCTION_ID = '69592373002208d6dd31'; // fetch_pl_data
     const PLAYERS_FUNCTION_ID = '695afdb40034ed9a82d7'; // sync_players
-    const RESET_SQUADS_FUNCTION_ID = 'reset_squads'; // TODO: Update with actual ID
+
 
     const executeFunction = async (funcId: string, action: string, season?: number) => {
         setLoading(action);

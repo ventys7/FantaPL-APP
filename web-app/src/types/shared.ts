@@ -28,3 +28,25 @@ export interface User {
         hidden?: boolean;
     };
 }
+
+export interface Team extends AppwriteDocument {
+    name: string;
+    short_name: string;
+    logo_url?: string;
+    external_id?: number;
+}
+
+export interface Fixture extends AppwriteDocument {
+    comp_id: number;
+    home_team_id: string;
+    away_team_id: string;
+    home_score: number | null;
+    away_score: number | null;
+    date: string;
+    status: string;
+    minute: number | null;
+    gameweek: number;
+    season: number;
+    external_id: number;
+    lineups?: string; // JSON string
+}

@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ArrowLeftRight, Coins, AlertCircle, Send, Loader2 } from 'lucide-react';
-import { SelectableTeamCard } from './SelectableTeamCard';
+import { X, ArrowLeftRight, Coins, AlertCircle, Send } from 'lucide-react';
 import { usePlayers } from '../../hooks/usePlayers';
 import { useAuth } from '../../context/AuthContext';
 import { databases, DB_ID, COLL_FANTASY_TEAMS } from '../../lib/appwrite';
 import { Query } from 'appwrite';
 import { CreateTradePayload } from '../../types/trade';
+import { TradeConfirmationDialog } from './TradeConfirmationDialog';
+import { TradeTeamPanel } from './TradeTeamPanel';
 
 interface FantasyTeam {
     $id: string;
@@ -214,17 +215,27 @@ export const TradeModal = ({ isOpen, onClose, onSubmit, myTeamId, myUserId }: Tr
 
     if (!isOpen) return null;
 
+    // Helper to get selected objects for the Confirmation Dialog
+    const getSelectedObjects = (playerIds: Set<string>, blockIds: Set<string>, sourcePlayers: any[]) => {
+        const sPlayers = Array.from(playerIds).map(id => sourcePlayers.find(p => p.$id === id)).filter(Boolean);
+        const sBlocks = Array.from(blockIds).map(id => realTeams.find(t => t.$id === id)).filter(Boolean);
+        return { sPlayers, sBlocks };
+    };
+
+    const mySelection = getSelectedObjects(mySelectedPlayers, mySelectedBlocks, myPlayers);
+    const opponentSelection = getSelectedObjects(opponentSelectedPlayers, opponentSelectedBlocks, opponentPlayers);
+
     return createPortal(
         <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
             {/* Backdrop */}
             <div
-                className="absolute inset-0 bg-black/80"
+                className="absolute inset-0 bg-black/80 transition-opacity"
                 onClick={handleClose}
             />
 
             {/* Modal */}
             <div
-                className="relative w-full max-w-6xl h-[80vh] md:h-auto md:max-h-[90vh] bg-[#18181b] rounded-2xl border border-white/10 shadow-2xl overflow-hidden flex flex-col"
+                className="relative w-full max-w-6xl h-[80vh] md:h-auto md:max-h-[85vh] bg-[#18181b] rounded-2xl border border-white/10 shadow-2xl overflow-hidden flex flex-col md:flex animate-in zoom-in-95 duration-200"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
@@ -261,84 +272,60 @@ export const TradeModal = ({ isOpen, onClose, onSubmit, myTeamId, myUserId }: Tr
 
                     <div className="flex-1 overflow-hidden flex flex-col md:flex-row relative">
                         {/* Left: My Team */}
-                        <div className={`flex-1 flex-col border-r border-white/10 overflow-hidden ${activeTab === 'my-team' ? 'flex' : 'hidden md:flex'}`}>
-                            <div className="px-4 py-3 bg-pl-teal/10 border-b border-white/5 flex-shrink-0 flex items-center justify-between">
-                                <div>
-                                    <h3 className="font-bold text-white">La Mia Rosa</h3>
-                                    <p className="text-xs text-gray-400">Seleziona i giocatori da offrire</p>
-                                </div>
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/30 rounded-lg">
-                                    <Coins size={14} className="text-pl-teal" />
-                                    <span className="text-sm font-mono font-bold text-pl-teal">{myCredits}</span>
-                                </div>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                <SelectableTeamCard
-                                    players={myPlayers}
-                                    realTeams={realTeams}
-                                    ownerName={user?.name || ''}
-                                    selectedPlayers={mySelectedPlayers}
-                                    selectedBlocks={mySelectedBlocks}
-                                    onTogglePlayer={handleToggleMyPlayer}
-                                    onToggleBlock={handleToggleMyBlock}
-                                />
-                            </div>
-                        </div>
+                        <TradeTeamPanel
+                            title="La Mia Rosa"
+                            subtitle="Seleziona i giocatori da offrire"
+                            credits={myCredits}
+                            players={myPlayers}
+                            realTeams={realTeams}
+                            selectedPlayers={mySelectedPlayers}
+                            selectedBlocks={mySelectedBlocks}
+                            onTogglePlayer={handleToggleMyPlayer}
+                            onToggleBlock={handleToggleMyBlock}
+                            ownerName={user?.name || ''}
+                            isActive={activeTab === 'my-team'}
+                        />
 
                         {/* Right: Opponent Team */}
-                        <div className={`flex-1 flex-col overflow-hidden ${activeTab === 'opponent-team' ? 'flex' : 'hidden md:flex'}`}>
-                            <div className="px-4 py-3 bg-black/20 border-b border-white/5 flex-shrink-0 flex items-center justify-between">
-                                <div>
-                                    <div className="inline-flex items-center gap-1">
-                                        <svg className="w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                        <select
-                                            value={selectedOpponent}
-                                            onChange={e => {
-                                                setSelectedOpponent(e.target.value);
-                                                setOpponentSelectedPlayers(new Set());
-                                                setOpponentSelectedBlocks(new Set());
-                                            }}
-                                            className="bg-transparent text-white text-base font-bold focus:outline-none cursor-pointer appearance-none"
-                                        >
-                                            <option value="">Seleziona partecipante...</option>
-                                            {fantasyTeams.filter(t => t.$id !== myTeamId && t.manager_name !== user?.name && t.user_id !== myUserId).map(team => (
-                                                <option key={team.$id} value={team.$id}>
-                                                    {team.manager_name} - {team.team_name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <p className="text-xs text-gray-400">Seleziona i giocatori da richiedere</p>
-                                </div>
-                                {opponentTeam && (
-                                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/30 rounded-lg">
-                                        <Coins size={14} className="text-pl-teal" />
-                                        <span className="text-sm font-mono font-bold text-pl-teal">{opponentTeam.credits_remaining}</span>
-                                    </div>
-                                )}
+                        <TradeTeamPanel
+                            title="" // Custom header via children
+                            subtitle="Seleziona i giocatori da richiedere"
+                            credits={opponentTeam?.credits_remaining || 0}
+                            showCredits={!!opponentTeam}
+                            players={opponentPlayers}
+                            realTeams={realTeams}
+                            selectedPlayers={opponentSelectedPlayers}
+                            selectedBlocks={opponentSelectedBlocks}
+                            onTogglePlayer={handleToggleOpponentPlayer}
+                            onToggleBlock={handleToggleOpponentBlock}
+                            ownerName={opponentTeam?.manager_name || ''}
+                            emptyMessage="Seleziona un partecipante per vedere la sua rosa"
+                            isActive={activeTab === 'opponent-team'}
+                        >
+                            {/* Dropdown for Opponent Selection */}
+                            <div className="inline-flex items-center gap-1">
+                                <svg className="w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                                <select
+                                    value={selectedOpponent}
+                                    onChange={e => {
+                                        setSelectedOpponent(e.target.value);
+                                        setOpponentSelectedPlayers(new Set());
+                                        setOpponentSelectedBlocks(new Set());
+                                    }}
+                                    className="bg-transparent text-white text-base font-bold focus:outline-none cursor-pointer appearance-none"
+                                >
+                                    <option value="">Seleziona partecipante...</option>
+                                    {fantasyTeams.filter(t => t.$id !== myTeamId && t.manager_name !== user?.name && t.user_id !== myUserId).map(team => (
+                                        <option key={team.$id} value={team.$id}>
+                                            {team.manager_name} - {team.team_name}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
-                            <div className="flex-1 overflow-y-auto p-4" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                                {selectedOpponent ? (
-                                    <SelectableTeamCard
-                                        players={opponentPlayers}
-                                        realTeams={realTeams}
-                                        ownerName={opponentTeam?.manager_name || ''}
-                                        selectedPlayers={opponentSelectedPlayers}
-                                        selectedBlocks={opponentSelectedBlocks}
-                                        onTogglePlayer={handleToggleOpponentPlayer}
-                                        onToggleBlock={handleToggleOpponentBlock}
-                                    />
-                                ) : (
-                                    <div className="flex items-center justify-center h-full text-gray-500">
-                                        Seleziona un partecipante per vedere la sua rosa
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        </TradeTeamPanel>
                     </div>
-
                 </div>
 
                 {/* Footer */}
@@ -416,96 +403,21 @@ export const TradeModal = ({ isOpen, onClose, onSubmit, myTeamId, myUserId }: Tr
                     </div>
                 </div>
 
-                {/* Confirmation Dialog */}
-                {showConfirmation && (
-                    <div className="absolute inset-0 bg-black/80 flex items-center justify-center p-4 z-10">
-                        <div className="bg-[#18181b] border border-white/20 rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
-                            <h3 className="text-lg font-bold text-white mb-4">Conferma Proposta</h3>
+                <TradeConfirmationDialog
+                    isOpen={showConfirmation}
+                    loading={loading}
+                    mySelectedPlayers={mySelection.sPlayers}
+                    mySelectedBlocks={mySelection.sBlocks}
+                    opponentSelectedPlayers={opponentSelection.sPlayers}
+                    opponentSelectedBlocks={opponentSelection.sBlocks}
+                    creditsOffered={creditsOffered}
+                    onClose={() => setShowConfirmation(false)}
+                    onConfirm={handleSubmit}
+                />
 
-                            {/* Offer section */}
-                            <div className="mb-3">
-                                <div className="text-xs uppercase font-bold text-red-400 mb-2">Offri</div>
-                                <div className="space-y-1 text-sm">
-                                    {Array.from(mySelectedPlayers).map(id => {
-                                        const p = myPlayers.find(pl => pl.$id === id);
-                                        return p ? (
-                                            <div key={id} className="flex items-center gap-2 bg-white/5 px-2 py-1 rounded">
-                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${p.position === 'Difensore' ? 'bg-blue-500/30 text-blue-400' : p.position === 'Centrocampista' ? 'bg-green-500/30 text-green-400' : 'bg-red-500/30 text-red-400'}`}>
-                                                    {p.position === 'Difensore' ? 'D' : p.position === 'Centrocampista' ? 'C' : 'A'}
-                                                </span>
-                                                <span className="text-white">{p.name}</span>
-                                            </div>
-                                        ) : null;
-                                    })}
-                                    {Array.from(mySelectedBlocks).map(blockId => {
-                                        const team = realTeams.find(t => t.$id === blockId);
-                                        return (
-                                            <div key={blockId} className="flex items-center gap-2 bg-yellow-500/10 px-2 py-1 rounded text-yellow-400">
-                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-yellow-500/30">P</span>
-                                                Blocco {team?.short_name || 'Squadra'}
-                                            </div>
-                                        );
-                                    })}
-                                    {creditsOffered > 0 && (
-                                        <div className="flex items-center gap-2 bg-green-500/10 px-2 py-1 rounded text-green-400">
-                                            💰 +{creditsOffered} crediti
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Request section */}
-                            <div className="mb-4">
-                                <div className="text-xs uppercase font-bold text-green-400 mb-2">Richiedi</div>
-                                <div className="space-y-1 text-sm">
-                                    {Array.from(opponentSelectedPlayers).map(id => {
-                                        const p = opponentPlayers.find(pl => pl.$id === id);
-                                        return p ? (
-                                            <div key={id} className="flex items-center gap-2 bg-white/5 px-2 py-1 rounded">
-                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${p.position === 'Difensore' ? 'bg-blue-500/30 text-blue-400' : p.position === 'Centrocampista' ? 'bg-green-500/30 text-green-400' : 'bg-red-500/30 text-red-400'}`}>
-                                                    {p.position === 'Difensore' ? 'D' : p.position === 'Centrocampista' ? 'C' : 'A'}
-                                                </span>
-                                                <span className="text-white">{p.name}</span>
-                                            </div>
-                                        ) : null;
-                                    })}
-                                    {Array.from(opponentSelectedBlocks).map(blockId => {
-                                        const team = realTeams.find(t => t.$id === blockId);
-                                        return (
-                                            <div key={blockId} className="flex items-center gap-2 bg-yellow-500/10 px-2 py-1 rounded text-yellow-400">
-                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-yellow-500/30">P</span>
-                                                Blocco {team?.short_name || 'Squadra'}
-                                            </div>
-                                        );
-                                    })}
-                                    {creditsOffered < 0 && (
-                                        <div className="flex items-center gap-2 bg-green-500/10 px-2 py-1 rounded text-green-400">
-                                            💰 +{Math.abs(creditsOffered)} crediti
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="flex gap-3 justify-end">
-                                <button
-                                    onClick={() => setShowConfirmation(false)}
-                                    className="px-4 py-2 rounded-lg bg-white/10 text-gray-300 hover:bg-white/20 transition"
-                                >
-                                    Annulla
-                                </button>
-                                <button
-                                    onClick={handleSubmit}
-                                    disabled={loading}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-pl-teal text-pl-dark font-bold hover:bg-pl-teal/90 transition disabled:opacity-50"
-                                >
-                                    {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                                    Conferma
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         </div >,
         document.body
     );
 };
+
