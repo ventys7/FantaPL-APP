@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { BookOpen, Edit3, Save, X, ChevronDown, ArrowUp, Plus, Trash2, Archive, Clock } from 'lucide-react';
-import { ArchivedRules } from '../types/rules';
+import { Edit3, Save, X, ChevronDown, ArrowUp, Plus, Trash2, BookText, BookOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRules } from '../hooks/useRules';
-import { ArchiveModal } from '../components/rules/ArchiveModal';
 import { EditableText, SortableRulesSection } from '../components/rules';
 import { TextFormattingToolbar } from '../components/TextFormattingToolbar';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -24,8 +22,8 @@ export function Rules() {
     const [showToolbar, setShowToolbar] = useState(false);
     const [activeTextarea, setActiveTextarea] = useState<HTMLTextAreaElement | null>(null);
     const [savedSelection, setSavedSelection] = useState<{ start: number, end: number } | null>(null);
-    const [selectedArchive, setSelectedArchive] = useState<ArchivedRules | null>(null);
 
+    const topRef = useRef<HTMLDivElement>(null);
     const indexRef = useRef<HTMLDivElement>(null);
     const sectionRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
 
@@ -152,9 +150,16 @@ export function Rules() {
     };
 
     const scrollToIndex = () => {
-        setActiveSection(null);
+        const mainElement = document.querySelector('main');
+        if (mainElement) {
+            // Use immediate scroll for reliability
+            mainElement.scrollTop = 0;
+        }
+
+        // Close section after scroll completes
         setTimeout(() => {
-            indexRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setActiveSection(null);
+            setOpenedFromIndex(false);
         }, 100);
     };
 
@@ -165,61 +170,90 @@ export function Rules() {
         } else {
             setActiveSection(sectionId);
             setOpenedFromIndex(false);
+            // Scroll to section after opening
+            setTimeout(() => {
+                sectionRefs.current[sectionId]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
         }
     };
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-pl-dark via-pl-dark to-pl-purple flex items-center justify-center">
+            <div className="min-h-screen bg-pl-dark flex items-center justify-center">
                 <div className="text-white text-xl">Caricamento regolamento...</div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-pl-dark via-pl-dark to-pl-purple py-8">
-            <div className="max-w-5xl mx-auto px-4">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-3">
-                        <BookOpen className="w-10 h-10 text-pl-pink" />
-                        <div>
-                            <h1 className="text-4xl font-black text-white">Regolamento PianginaCUP</h1>
-                            <p className="text-gray-400 text-sm mt-1">Stagione 2025/26</p>
-                        </div>
-                    </div>
+        <div className="min-h-screen bg-pl-dark py-8 md:py-12">
+            <div ref={topRef} className="max-w-6xl mx-auto px-4">
 
-                    {hasRole('admin') && (
-                        <div className="flex gap-2">
-                            {editMode ? (
-                                <span className="text-pl-pink text-sm">✏️ Modalità Modifica Attiva</span>
-                            ) : (
-                                <button
-                                    onClick={() => setEditMode(true)}
-                                    className="flex items-center gap-2 px-4 py-2 bg-pl-pink/20 hover:bg-pl-pink/30 rounded-lg text-white border border-pl-pink/50 transition"
-                                >
-                                    <Edit3 size={18} />
-                                    Modifica
-                                </button>
-                            )}
+                {/* Header */}
+                <div className="relative mb-10 md:mb-14">
+
+                    <div className="relative flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex items-center gap-5">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-gradient-to-br from-pl-pink to-pl-purple rounded-2xl blur-lg opacity-50" />
+                                <div className="relative bg-gradient-to-br from-pl-pink to-pl-purple p-4 rounded-2xl">
+                                    <BookOpen className="w-10 h-10 text-white" />
+                                </div>
+                            </div>
+                            <div>
+                                <h1 className="text-3xl md:text-5xl font-black bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent pb-1">
+                                    Regolamento
+                                </h1>
+                                {editMode && hasRole('admin') ? (
+                                    <input
+                                        type="text"
+                                        value={cenniPrincipali.subtitle || 'PianginaCUP • Stagione 2025/26'}
+                                        onChange={(e) => setCenniPrincipali(prev => ({ ...prev, subtitle: e.target.value }))}
+                                        className="text-gray-400 text-sm md:text-base mt-1 font-medium tracking-wide bg-transparent border-b border-pl-pink/30 focus:outline-none focus:border-pl-pink w-full"
+                                    />
+                                ) : (
+                                    <p className="text-gray-400 text-sm md:text-base mt-1 font-medium tracking-wide">
+                                        {cenniPrincipali.subtitle || 'PianginaCUP • Stagione 2025/26'}
+                                    </p>
+                                )}
+                            </div>
                         </div>
-                    )}
+
+                        {hasRole('admin') && (
+                            <div className="flex gap-3">
+                                {editMode ? (
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-pl-pink/10 border border-pl-pink/30 rounded-xl">
+                                        <div className="w-2 h-2 bg-pl-pink rounded-full animate-pulse" />
+                                        <span className="text-pl-pink text-sm font-medium">Modifica Attiva</span>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setEditMode(true)}
+                                        className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-pl-pink/20 to-pl-purple/20 hover:from-pl-pink/30 hover:to-pl-purple/30 rounded-xl text-white border border-pl-pink/30 hover:border-pl-pink/50 transition-all duration-300"
+                                    >
+                                        <Edit3 size={18} className="group-hover:rotate-12 transition-transform" />
+                                        <span className="font-semibold">Modifica</span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                {/* Floating Save/Cancel Bar */}
+                {/* Floating Save/Cancel Bar - Enhanced */}
                 {editMode && hasRole('admin') && (
-                    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-pl-dark/95 backdrop-blur-lg border border-white/20 rounded-xl shadow-2xl px-6 py-3 z-50 flex gap-4">
+                    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#18181b]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 px-6 py-4 z-50 flex gap-4">
                         <button
                             onClick={handleSave}
                             disabled={saving}
-                            className="flex items-center gap-2 px-5 py-2 bg-green-500/20 hover:bg-green-500/30 rounded-lg text-white border border-green-500/50 transition disabled:opacity-50"
+                            className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-green-500/20 to-emerald-500/20 hover:from-green-500/30 hover:to-emerald-500/30 rounded-xl text-white border border-green-500/30 transition-all disabled:opacity-50 font-semibold"
                         >
                             <Save size={18} />
-                            {saving ? 'Salvataggio...' : 'Salva Modifiche'}
+                            {saving ? 'Salvataggio...' : 'Salva'}
                         </button>
                         <button
                             onClick={() => { setEditMode(false); clearUndoHistory(); loadRules(); }}
-                            className="flex items-center gap-2 px-5 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-white border border-red-500/50 transition"
+                            className="flex items-center gap-2 px-6 py-2.5 bg-red-500/10 hover:bg-red-500/20 rounded-xl text-red-400 border border-red-500/20 hover:border-red-500/30 transition-all font-semibold"
                         >
                             <X size={18} />
                             Annulla
@@ -228,75 +262,70 @@ export function Rules() {
                 )}
 
                 {/* Main Content Grid */}
-                <div className="flex flex-col md:flex-row gap-8 items-start">
+                <div className="flex flex-col lg:flex-row gap-8 items-start">
 
-                    {/* Left Sidebar - Index (Sticky on Desktop) */}
-                    <div className="w-full md:w-1/4 md:sticky md:top-8 order-1">
-                        <div ref={indexRef} className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20">
-                            <h2 className="text-xl font-bold text-pl-teal mb-4 flex items-center gap-2">
-                                📑 Indice
+                    {/* Left Sidebar - Index (Sticky) */}
+                    <div className="w-full lg:w-72 lg:sticky lg:top-8 order-1 space-y-5">
+                        {/* Index Card */}
+                        <div ref={indexRef} className="group bg-gradient-to-br from-white/[0.08] to-white/[0.02] backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-white/20 transition-all duration-300">
+                            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2.5">
+                                <div className="p-2 bg-pl-teal/20 rounded-lg">
+                                    <BookText size={18} className="text-pl-teal" />
+                                </div>
+                                Indice
                             </h2>
-                            <div className="flex flex-col gap-2">
+                            <nav className="flex flex-col gap-1.5">
                                 <button
-                                    onClick={() => scrollToSection(-1)} // -1 for Cenni Principali
-                                    className="text-left text-gray-300 hover:text-white font-medium px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition text-sm"
+                                    onClick={() => scrollToSection(-1)}
+                                    className={`text-left text-sm font-medium px-3.5 py-2.5 rounded-xl transition-all duration-200 ${activeSection === -1
+                                        ? 'bg-pl-teal/20 text-pl-teal border border-pl-teal/30'
+                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        }`}
                                 >
-                                    {cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}
+                                    {cenniPrincipali.title || '1. Cenni Principali'}
                                 </button>
-                                {sections.map(section => (
+                                {sections.map((section, idx) => (
                                     <button
                                         key={section.id}
                                         onClick={() => scrollToSection(section.id)}
-                                        className="text-left text-gray-300 hover:text-white font-medium px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition text-sm"
+                                        className={`text-left text-sm font-medium px-3.5 py-2.5 rounded-xl transition-all duration-200 ${activeSection === section.id
+                                            ? 'bg-pl-teal/20 text-pl-teal border border-pl-teal/30'
+                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                            }`}
                                     >
                                         {section.title}
                                     </button>
                                 ))}
-                            </div>
-                        </div>
-                        {/* Archive Dropdown (Below Index) */}
-                        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 mt-4">
-                            <h2 className="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2">
-                                <Archive size={24} />
-                                Archivio
-                            </h2>
-                            {archivedRules.length === 0 ? (
-                                <p className="text-gray-400 text-sm italic">Nessun archivio.</p>
-                            ) : (
-                                <div className="space-y-2">
-                                    {archivedRules.map(archive => (
-                                        <button
-                                            key={archive.$id}
-                                            onClick={() => setSelectedArchive(archive)}
-                                            className="w-full text-left text-gray-300 hover:text-white font-medium px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition text-sm flex items-center gap-2"
-                                        >
-                                            <Clock size={14} className="text-amber-400" />
-                                            <span>Stagione {archive.season}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
+                            </nav>
                         </div>
                     </div>
 
                     {/* Right Content - Sections */}
-                    <div className="w-full md:w-3/4 order-2 space-y-8">
+                    <div className="flex-1 order-2 space-y-6">
 
-                        {/* Section 1: Cenni Principali */}
-                        <div ref={el => sectionRefs.current[-1] = el} className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20">
+                        {/* Section 1: Cenni Principali - Featured */}
+                        <div
+                            ref={el => sectionRefs.current[-1] = el}
+                            className="relative bg-gradient-to-br from-white/[0.08] to-white/[0.02] backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/10 overflow-hidden"
+                        >
+                            {/* Decorative accent */}
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pl-pink via-pl-purple to-pl-teal" />
+
                             <div className="text-center mb-8">
                                 {editMode && hasRole('admin') ? (
                                     <input
                                         type="text"
                                         value={cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}
                                         onChange={(e) => setCenniPrincipali(prev => ({ ...prev, title: e.target.value }))}
-                                        className="text-3xl font-bold text-pl-teal bg-transparent border-b border-pl-pink/30 focus:outline-none focus:border-pl-pink text-center w-full"
+                                        className="text-2xl md:text-3xl font-bold text-pl-teal bg-transparent border-b-2 border-pl-pink/30 focus:outline-none focus:border-pl-pink text-center w-full pb-2"
                                     />
                                 ) : (
-                                    <h2 className="text-3xl font-bold text-pl-teal">{cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}</h2>
+                                    <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-pl-teal to-emerald-400 bg-clip-text text-transparent">
+                                        {cenniPrincipali.title || '1. Cenni Principali e Avvertenze'}
+                                    </h2>
                                 )}
                             </div>
-                            <div className="text-gray-200 leading-relaxed space-y-4">
+                            <div className="text-gray-300 leading-relaxed space-y-4 text-[15px]">
                                 <EditableText
                                     value={cenniPrincipali.mainText}
                                     onChange={(val: string) => setCenniPrincipali(prev => ({ ...prev, mainText: val }))}
@@ -322,14 +351,14 @@ export function Rules() {
                                     {editMode && hasRole('admin') && (
                                         <button
                                             onClick={addSection}
-                                            className="w-full flex items-center justify-center gap-2 py-3 bg-pl-teal/20 hover:bg-pl-teal/30 rounded-xl text-white border border-pl-teal/50 transition"
+                                            className="w-full flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-pl-teal/10 to-emerald-500/10 hover:from-pl-teal/20 hover:to-emerald-500/20 rounded-2xl text-pl-teal border border-pl-teal/20 hover:border-pl-teal/40 transition-all font-semibold"
                                         >
                                             <Plus size={20} />
                                             Aggiungi Sezione
                                         </button>
                                     )}
 
-                                    {sections.map(section => (
+                                    {sections.map((section, idx) => (
                                         <SortableRulesSection
                                             key={section.id}
                                             id={section.id}
@@ -337,10 +366,13 @@ export function Rules() {
                                         >
                                             <div
                                                 ref={el => sectionRefs.current[section.id] = el}
-                                                className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-hidden"
+                                                className={`bg-gradient-to-br from-white/[0.06] to-white/[0.02] backdrop-blur-xl rounded-2xl border transition-all duration-300 overflow-hidden ${activeSection === section.id
+                                                    ? 'border-white/20 shadow-lg shadow-black/20'
+                                                    : 'border-white/10 hover:border-white/15'
+                                                    }`}
                                             >
                                                 <div
-                                                    className="flex items-center justify-between p-6 cursor-pointer hover:bg-white/5 transition"
+                                                    className="flex items-center justify-between p-5 md:p-6 cursor-pointer hover:bg-white/[0.02] transition-all group"
                                                     onClick={() => toggleSection(section.id)}
                                                 >
                                                     {editMode && hasRole('admin') ? (
@@ -349,28 +381,32 @@ export function Rules() {
                                                             value={section.title}
                                                             onChange={e => updateSection(section.id, 'title', e.target.value)}
                                                             onClick={e => e.stopPropagation()}
-                                                            className="flex-1 text-xl font-bold text-white bg-transparent border-b border-pl-pink/30 focus:outline-none focus:border-pl-pink text-center"
+                                                            className="flex-1 text-lg md:text-xl font-bold text-white bg-transparent border-b-2 border-pl-pink/30 focus:outline-none focus:border-pl-pink text-center pb-1"
                                                         />
                                                     ) : (
-                                                        <h3 className="flex-1 text-xl font-bold text-white text-center">{section.title}</h3>
+                                                        <h3 className="flex-1 text-lg md:text-xl font-bold text-white text-center group-hover:text-gray-100 transition-colors">
+                                                            {section.title}
+                                                        </h3>
                                                     )}
-                                                    <ChevronDown
-                                                        size={24}
-                                                        className={`text-gray-400 transition-transform ml-4 ${activeSection === section.id ? 'rotate-180' : ''}`}
-                                                    />
+                                                    <div className={`p-2 rounded-full bg-white/5 group-hover:bg-white/10 transition-all ml-4 ${activeSection === section.id ? 'bg-pl-teal/20' : ''}`}>
+                                                        <ChevronDown
+                                                            size={20}
+                                                            className={`text-gray-400 transition-all duration-300 ${activeSection === section.id ? 'rotate-180 text-pl-teal' : 'group-hover:text-white'}`}
+                                                        />
+                                                    </div>
                                                     {editMode && hasRole('admin') && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); removeSection(section.id); }}
-                                                            className="ml-2 p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-400 border border-red-500/50 transition"
+                                                            className="ml-3 p-2.5 bg-red-500/10 hover:bg-red-500/20 rounded-xl text-red-400 border border-red-500/20 hover:border-red-500/30 transition-all"
                                                         >
-                                                            <Trash2 size={18} />
+                                                            <Trash2 size={16} />
                                                         </button>
                                                     )}
                                                 </div>
 
                                                 {activeSection === section.id && (
-                                                    <div className="p-6 pt-0 border-t border-white/10">
-                                                        <div className="text-gray-200 leading-relaxed space-y-3">
+                                                    <div className="px-5 md:px-6 pb-6 pt-2 border-t border-white/5 animate-in slide-in-from-top-2 duration-200">
+                                                        <div className="text-gray-300 leading-relaxed space-y-3 text-[15px]">
                                                             <EditableText
                                                                 value={section.content}
                                                                 onChange={(val: string) => updateSection(section.id, 'content', val)}
@@ -379,12 +415,12 @@ export function Rules() {
                                                                 dataField={`section-${section.id}`}
                                                             />
                                                         </div>
-                                                        {openedFromIndex && activeSection === section.id && (
+                                                        {activeSection === section.id && (
                                                             <button
                                                                 onClick={scrollToIndex}
-                                                                className="mt-6 flex items-center gap-2 px-4 py-2 bg-pl-teal/20 hover:bg-pl-teal/30 rounded-lg text-white border border-pl-teal/50 transition mx-auto md:hidden"
+                                                                className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-pl-teal/10 hover:bg-pl-teal/20 rounded-xl text-pl-teal border border-pl-teal/20 transition-all mx-auto lg:hidden font-medium"
                                                             >
-                                                                <ArrowUp size={18} />
+                                                                <ArrowUp size={16} />
                                                                 Torna all'Indice
                                                             </button>
                                                         )}
@@ -397,20 +433,13 @@ export function Rules() {
                             </SortableContext>
                         </DndContext>
 
-
+                        {/* Bottom spacer */}
+                        <div className="h-8" />
                     </div>
 
 
 
-                    {/* Archive Modal */}
-                    {selectedArchive && (
-                        <ArchiveModal
-                            archive={selectedArchive}
-                            onClose={() => setSelectedArchive(null)}
-                        />
-                    )}
-
-                    {/* Text Formatting Toolbar - Fixed Position (Global) */}
+                    {/* Text Formatting Toolbar */}
                     {editMode && hasRole('admin') && (
                         <TextFormattingToolbar
                             visible={showToolbar}

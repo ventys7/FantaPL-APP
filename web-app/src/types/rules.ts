@@ -16,6 +16,7 @@ export interface ArchivedRules {
 
 export interface CenniPrincipali {
     title?: string;
+    subtitle?: string;
     mainText: string;
     partecipanti: string;
 }

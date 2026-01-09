@@ -30,7 +30,8 @@ export function EditableText({
                     data-field={dataField}
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
-                    className={`w-full bg-pl-dark/50 border border-pl-pink/30 rounded-lg p-4 text-white focus:outline-none focus:ring-2 focus:ring-pl-pink resize-y min-h-[200px] font-mono text-sm leading-relaxed ${className}`}
+                    className={`w-full bg-[#0a0a0f]/80 border border-white/10 focus:border-pl-pink/50 rounded-xl p-5 text-gray-200 focus:outline-none focus:ring-2 focus:ring-pl-pink/20 resize-y min-h-[250px] font-mono text-sm leading-relaxed placeholder:text-gray-600 transition-all ${className}`}
+                    placeholder="Inserisci il contenuto qui..."
                 />
             );
         }
@@ -39,7 +40,7 @@ export function EditableText({
                 type="text"
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
-                className={`w-full bg-pl-dark/50 border border-pl-pink/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-pl-pink ${className}`}
+                className={`w-full bg-[#0a0a0f]/80 border border-white/10 focus:border-pl-pink/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-pl-pink/20 transition-all ${className}`}
             />
         );
     }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trophy, Calendar, Users, Shield, FileText, LogIn, LogOut, ChevronDown, Menu, X, ClipboardList, Shirt, Settings, ArrowLeftRight } from 'lucide-react';
+import { Trophy, Calendar, Users, Shield, FileText, LogIn, LogOut, ChevronDown, Menu, X, ClipboardList, Shirt, Settings, ArrowLeftRight, BookOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export const Navbar = () => {
@@ -74,7 +74,7 @@ export const Navbar = () => {
                     </Link>
 
                     <Link to="/rules" className="hidden md:flex flex-col items-center text-gray-300 hover:text-white transition cursor-pointer">
-                        <Shield size={20} />
+                        <BookOpen size={20} />
                         <span className="text-xs mt-1">Regolamento</span>
                     </Link>
 
@@ -172,7 +172,7 @@ export const Navbar = () => {
                             className="flex items-center gap-3 px-6 py-4 text-gray-300 hover:text-white hover:bg-white/10 transition"
                             onClick={closeMobileMenu}
                         >
-                            <Shield size={20} />
+                            <BookOpen size={20} />
                             <span>Regolamento</span>
                         </Link>
                     </div>
